@@ -1,0 +1,1608 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Wave Model Field</title>
+<meta name="description" content="A working mathematical model of Fabin Rasheed's wave model of the psyche, run at three scales.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400;1,600&display=swap">
+<style>
+/* Layout: an instrument bench. The live field fills the stage on the left; a rack of readouts,
+   diagrams and controls runs down the right. Notes is a separate reading room.
+   Deliberately single-theme: a dark observatory where the zero-state is the brightest thing. */
+:root {
+  --void: #0b0c14;
+  --panel: #10121c;
+  --panel-2: #171a28;
+  --line: #262a3d;
+  --line-2: #33384f;
+  --ink: #ece7dc;
+  --ink-2: #aeadbd;
+  --ink-3: #74758c;
+  --reach: #f2a33a;   /* phase 0: reaching (crest) */
+  --rise: #e8557f;    /* phase pi/2 */
+  --resist: #5b86ff;  /* phase pi: resisting (trough) */
+  --fall: #27c2ae;    /* phase 3pi/2 */
+  --zero: #f6f1e6;    /* the zero-state: pearl light */
+  --ego: #a792ff;     /* the ego, 'I' */
+  --chart-a: #c47f22;
+  --chart-b: #5a82f5;
+  --warn: #ff8a6b;
+  --good: #7fd6a4;
+  --f-display: "STIX Two Text", "STIX Two", "Iowan Old Style", "Times New Roman", serif;
+  --f-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --rack-w: 400px;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--void); color: var(--ink); font: 14px/1.5 var(--f-ui); -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--zero); outline-offset: 2px; }
+
+.app { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px 24px; flex-wrap: wrap; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--void); }
+.brand { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; min-width: 0; }
+.brand h1 { margin: 0; font: 400 24px/1.1 var(--f-display); letter-spacing: 0.005em; }
+.brand h1 em { font-style: italic; color: var(--zero); }
+.brand p { margin: 0; font-size: 12.5px; color: var(--ink-3); }
+.brand p i { color: var(--ink-2); }
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px 6px; color: var(--ink-2); cursor: pointer; display: flex; align-items: baseline; gap: 7px; font-size: 13.5px; }
+.tab .num { font: italic 400 15px/1 var(--f-display); color: var(--ink-3); }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--zero); }
+.tab[aria-selected="true"] .num { color: var(--zero); }
+
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) var(--rack-w); min-height: 0; }
+.stage { position: relative; min-height: 0; overflow: hidden; background: radial-gradient(ellipse 80% 70% at 50% 42%, #161a2b 0%, #0e1019 55%, var(--void) 100%); }
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#gl.dragging { cursor: grabbing; }
+.ov { position: absolute; pointer-events: none; }
+.ov > * { pointer-events: auto; }
+.stage-title { top: 14px; left: 16px; right: 16px; }
+.stage-title .k { font: italic 400 19px/1.2 var(--f-display); color: var(--ink); margin: 0; }
+.stage-title .s { font: 400 11.5px/1.4 var(--f-data); color: var(--ink-3); margin: 3px 0 0; letter-spacing: 0.02em; }
+.transport { left: 12px; bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; max-width: calc(100% - 200px); }
+.legend { right: 14px; bottom: 12px; display: flex; gap: 10px; align-items: center; background: rgba(11, 12, 20, 0.72); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.wheel { width: 46px; height: 46px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle, var(--zero) 0 12%, rgba(246,241,230,0) 58%), conic-gradient(from 90deg, var(--reach) 0deg, var(--fall) 90deg, var(--resist) 180deg, var(--rise) 270deg, var(--reach) 360deg); }
+.legend dl { margin: 0; display: grid; grid-template-columns: auto auto; gap: 1px 8px; font: 11px/1.35 var(--f-data); color: var(--ink-2); }
+.legend dt { display: flex; align-items: center; gap: 5px; }
+.legend dt::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.legend dd { margin: 0; color: var(--ink-3); }
+.labels { inset: 0; }
+.lbl { position: absolute; transform: translate(-50%, -50%); font: 11px/1 var(--f-data); color: var(--ink-3); white-space: nowrap; pointer-events: none; letter-spacing: 0.03em; }
+.lbl.ego { color: var(--ego); }
+.toast { left: 50%; top: 64px; transform: translateX(-50%); background: rgba(16, 18, 28, 0.92); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; color: var(--ink); opacity: 0; transition: opacity .35s; max-width: min(520px, calc(100% - 32px)); text-align: center; }
+.toast.show { opacity: 1; }
+.fallback { inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--ink-2); }
+
+.rack { overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 20px 20px 40px; min-width: 0; }
+.panel { display: grid; gap: 18px; }
+.eyebrow { margin: 0; font: 500 10.5px/1 var(--f-data); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+.panel h2 { margin: -8px 0 0; font: 400 25px/1.15 var(--f-display); text-wrap: balance; }
+.lede { margin: 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.55; }
+.lede b { color: var(--ink); font-weight: 500; }
+.eq { font: italic 400 16px/1.5 var(--f-display); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; overflow-x: auto; white-space: nowrap; }
+.eq .up { font-style: normal; }
+.eq small { display: block; font: 400 11px/1.45 var(--f-data); font-style: normal; color: var(--ink-3); white-space: normal; margin-top: 3px; }
+.readouts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; margin: 0; }
+.readouts div { min-width: 0; }
+.readouts dt { font: 400 11.5px/1.2 var(--f-ui); color: var(--ink-3); }
+.readouts dd { margin: 3px 0 0; font: 400 16px/1.2 var(--f-data); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.readouts dd .u { font-size: 11px; color: var(--ink-3); margin-left: 2px; }
+.pill { display: inline-block; font: 500 10.5px/1 var(--f-data); padding: 4px 7px; border-radius: 99px; border: 1px solid var(--line-2); color: var(--ink-2); letter-spacing: 0.05em; }
+.pill.attach { color: var(--reach); border-color: rgba(242,163,58,.45); }
+.pill.band { color: var(--ego); border-color: rgba(167,146,255,.45); }
+.pill.free { color: var(--zero); border-color: rgba(246,241,230,.5); }
+figure { margin: 0; display: grid; gap: 6px; }
+figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font: 500 10.5px/1.2 var(--f-data); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+figcaption span:last-child { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.chart { position: relative; }
+.chart canvas { display: block; width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; }
+.tip { position: absolute; pointer-events: none; background: #1d2133; border: 1px solid var(--line-2); border-radius: 5px; padding: 5px 7px; font: 11px/1.4 var(--f-data); color: var(--ink); white-space: nowrap; transform: translate(-50%, calc(-100% - 8px)); opacity: 0; transition: opacity .1s; z-index: 2; font-variant-numeric: tabular-nums; }
+.tip.on { opacity: 1; }
+fieldset { margin: 0; padding: 14px 0 0; border: 0; border-top: 1px solid var(--line); display: grid; gap: 12px; min-width: 0; }
+legend { padding: 0 8px 0 0; font: 500 10.5px/1 var(--f-data); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.btn { background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 6px; padding: 7px 11px; cursor: pointer; font-size: 12.5px; line-height: 1.2; color: var(--ink); transition: border-color .15s, background .15s; }
+.btn:hover { border-color: var(--ink-3); background: #1d2133; }
+.btn.strong { background: var(--zero); color: var(--void); border-color: var(--zero); font-weight: 500; }
+.btn.strong:hover { background: #fffaf0; }
+.btn[aria-pressed="true"] { border-color: var(--zero); color: var(--zero); }
+.btn.sm { padding: 5px 9px; font-size: 12px; }
+.ov .btn { background: rgba(23, 26, 40, 0.85); backdrop-filter: blur(4px); }
+.ctl { display: grid; gap: 4px; }
+.ctl .lab { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--ink-2); }
+.ctl .lab output { font: 12px/1.3 var(--f-data); color: var(--ink); font-variant-numeric: tabular-nums; }
+.ctl .hint { font-size: 11.5px; color: var(--ink-3); line-height: 1.4; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; margin: 0; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { height: 2px; background: var(--line-2); border-radius: 2px; }
+input[type=range]::-moz-range-track { height: 2px; background: var(--line-2); border-radius: 2px; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 3px solid var(--panel); margin-top: -6px; box-shadow: 0 0 0 1px var(--ink-3); }
+input[type=range]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--ink-3); }
+.note { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin: 0; }
+.note b { color: var(--ink); font-weight: 500; }
+.verdict { font: 12px/1.45 var(--f-data); color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; }
+.verdict.bad { color: var(--warn); border-color: rgba(255,138,107,.35); }
+.verdict.good { color: var(--zero); }
+.swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 0; margin-right: 5px; background: var(--c); }
+
+/* Notes reading room */
+.notes { overflow-y: auto; padding-block: 36px 72px; padding-inline: 20px; min-height: 0; }
+.notes .wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 20px; }
+.notes h2 { margin: 26px 0 0; font: 400 30px/1.15 var(--f-display); text-wrap: balance; }
+.notes h2:first-of-type { margin-top: 4px; }
+.notes h3 { margin: 12px 0 -6px; font: 600 18px/1.3 var(--f-display); text-wrap: balance; }
+.notes h3 .n { font: italic 400 18px var(--f-display); color: var(--ink-3); margin-right: 6px; }
+.notes p, .notes li { font-size: 15px; line-height: 1.65; color: var(--ink-2); max-width: 68ch; }
+.notes p b, .notes li b { color: var(--ink); font-weight: 500; }
+.notes .intro { font: 400 19px/1.55 var(--f-display); color: var(--ink); max-width: 62ch; }
+.notes em.m { font-family: var(--f-display); font-size: 1.08em; color: var(--ink); }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.tbl table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 13.5px; }
+.tbl th, .tbl td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.tbl th { font: 500 10.5px/1.2 var(--f-data); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); background: var(--panel); }
+.tbl td { color: var(--ink-2); }
+.tbl td:first-child { color: var(--ink); }
+.tbl td.m { font: italic 400 15px/1.4 var(--f-display); color: var(--ink); white-space: nowrap; }
+.tbl tr:last-child td { border-bottom: 0; }
+.fig { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 14px 10px; display: grid; gap: 8px; }
+.fig .cap { font-size: 13px; color: var(--ink-3); line-height: 1.5; }
+.fig .cap b { color: var(--ink-2); font-weight: 500; }
+.fig .keys { display: flex; gap: 14px; flex-wrap: wrap; font: 11.5px/1.3 var(--f-data); color: var(--ink-2); }
+.fig .keys span { display: inline-flex; align-items: center; gap: 6px; }
+.fig .keys i { display: inline-block; width: 16px; height: 2px; background: var(--c); }
+.fig .keys i.dash { background: repeating-linear-gradient(90deg, var(--c) 0 4px, transparent 4px 7px); }
+.fig svg { width: 100%; height: auto; display: block; overflow: visible; }
+.refs { font-size: 13px; color: var(--ink-3); padding-left: 18px; }
+.refs li { font-size: 13px; line-height: 1.55; color: var(--ink-3); }
+.callout { border-left: 2px solid var(--zero); padding: 4px 0 4px 16px; }
+.callout p { color: var(--ink); }
+
+@media (max-width: 960px) {
+  :root { --rack-w: 340px; }
+}
+@media (max-width: 820px) {
+  .app { height: auto; min-height: 100%; }
+  .bench { grid-template-columns: minmax(0, 1fr); }
+  .stage { height: 64vh; min-height: 360px; max-height: 720px; }
+  .rack { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding-inline: 16px; }
+  .notes { overflow: visible; padding-inline: 16px; }
+  .transport { max-width: calc(100% - 24px); bottom: 70px; }
+  .legend { right: auto; left: 12px; bottom: 12px; padding: 6px 8px; }
+  .wheel { width: 34px; height: 34px; }
+  .brand p { display: none; }
+  .top { padding: 8px 16px; }
+  .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Wave Model <em>Field</em></h1>
+      <p>A working model of <i>A wave model of interaction between the psyche and environment</i> (F. Rasheed, preprint)</p>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Scale">
+      <button class="tab" role="tab" id="tab-psyche" data-tab="psyche" aria-selected="true"><span class="num">I</span>Psyche</button>
+      <button class="tab" role="tab" id="tab-population" data-tab="population" aria-selected="false"><span class="num">II</span>Population</button>
+      <button class="tab" role="tab" id="tab-universe" data-tab="universe" aria-selected="false"><span class="num">III</span>Universe</button>
+      <button class="tab" role="tab" id="tab-notes" data-tab="notes" aria-selected="false"><span class="num">&#8756;</span>What emerged</button>
+    </nav>
+  </header>
+
+  <main class="bench" id="bench">
+    <section class="stage" id="stage" aria-label="Live simulation">
+      <canvas id="gl" aria-label="Three.js view of the simulation"></canvas>
+      <div class="ov labels" id="labels"></div>
+      <div class="ov stage-title"><p class="k" id="stageK">One psyche, from conception to death</p><p class="s" id="stageS">time runs upward · each thread is a knot</p></div>
+      <div class="ov toast" id="toast" role="status" aria-live="polite"></div>
+      <div class="ov transport" id="transport">
+        <button class="btn sm" id="playBtn" aria-pressed="false">Pause</button>
+        <button class="btn sm" id="speedBtn" title="Simulation speed">Speed 1×</button>
+        <span class="row" id="viewBtns"></span>
+      </div>
+      <div class="ov legend" aria-label="Colour key">
+        <div class="wheel" aria-hidden="true"></div>
+        <dl>
+          <dt style="--c: var(--reach)">reaching</dt><dd>Re z &gt; 0</dd>
+          <dt style="--c: var(--resist)">resisting</dt><dd>Re z &lt; 0</dd>
+          <dt style="--c: var(--zero)">zero-state</dt><dd>|z| &rarr; 0</dd>
+        </dl>
+      </div>
+      <div class="ov fallback" id="fallback" hidden></div>
+    </section>
+
+    <aside class="rack" id="rack">
+      <!-- I. PSYCHE -->
+      <div class="panel" data-panel="psyche">
+        <p class="eyebrow">Scale I · one person</p>
+        <h2>A life, drawn by its knots</h2>
+        <p class="lede">Seven inherited knots, each a wave. The <b>ego</b> sets the sign of the mirror&rsquo;s feedback. In phase (<i>μ</i> &gt; 0) a knot grows toward attachment. Out of phase (<i>μ</i> &lt; 0) it falls to zero, and time spent near zero is felt as bliss. Each bliss teaches the ego to lean further toward negative feedback.</p>
+        <div class="eq">ż<sub>k</sub> = (μ<sub>k</sub> + iω<sub>k</sub>) z<sub>k</sub> + (1 + iβ)|z<sub>k</sub>|²z<sub>k</sub> − |z<sub>k</sub>|⁴z<sub>k</sub>
+          <small>μ<sub>k</sub> = μ₀ − Λ(1 − e<sup>−W/60</sup>) + craving<sub>k</sub> − presence · W = ∫ bliss dt</small></div>
+        <dl class="readouts">
+          <div><dt>Age</dt><dd id="pAge">0%</dd></div>
+          <div><dt>Ego gain μ̄</dt><dd id="pMu">0.10</dd></div>
+          <div><dt>Regime</dt><dd id="pRegime"><span class="pill attach">attaching</span></dd></div>
+          <div><dt>Ego I = Σ|z|²</dt><dd id="pEgo">0.00</dd></div>
+          <div><dt>Bliss now</dt><dd id="pBliss">0.00</dd></div>
+          <div><dt>Wisdom W</dt><dd id="pW">0</dd></div>
+        </dl>
+        <figure>
+          <figcaption><span>Roadmap · knot amplitude against ego gain</span><span id="bifNote"></span></figcaption>
+          <div class="chart"><canvas id="bifCanvas" height="200" aria-label="Bifurcation diagram with each knot plotted"></canvas></div>
+          <p class="note">Solid lines are states a knot can rest in; dashed lines are tipping points. Between <i>μ</i> = −¼ and 0 both rest states coexist: small knots dissolve, large ones hold on. That band is the paper&rsquo;s accumulation threshold.</p>
+        </figure>
+        <figure>
+          <figcaption><span>This life so far</span><span id="lifeNote">cf. Fig. 11</span></figcaption>
+          <div class="chart" id="lifeWrap"><canvas id="lifeCanvas" height="170" aria-label="Psyche wave, ego and bliss over the lifetime"></canvas><div class="tip" id="lifeTip"></div></div>
+        </figure>
+        <fieldset>
+          <legend>Intervene</legend>
+          <div class="row">
+            <button class="btn strong" id="antiBtn">Send antidote</button>
+            <button class="btn" id="traumaBtn">Trauma</button>
+            <button class="btn" id="desireBtn">Desire</button>
+          </div>
+          <div class="ctl"><div class="lab"><label for="dose">Dose α (antidote size)</label><output id="doseVal"></output></div><input type="range" id="dose" min="0" max="2" step="0.01" value="1"></div>
+          <div class="ctl"><div class="lab"><label for="aim">Aim error δ (miss of the root)</label><output id="aimVal"></output></div><input type="range" id="aim" min="0" max="180" step="1" value="15"></div>
+          <div class="verdict" id="antiVerdict"></div>
+          <div class="ctl"><div class="lab"><label for="presence">Presence of a zero-state other</label><output id="presenceVal"></output></div><input type="range" id="presence" min="0" max="0.4" step="0.01" value="0"><span class="hint">Dampening: coupling to someone at z = 0 lowers every μ<sub>k</sub> by this amount.</span></div>
+        </fieldset>
+        <fieldset>
+          <legend>This life&rsquo;s settings</legend>
+          <div class="ctl"><div class="lab"><label for="mu0">Ego gain at birth μ₀</label><output id="mu0Val"></output></div><input type="range" id="mu0" min="-0.3" max="0.3" step="0.01" value="0.10"></div>
+          <div class="ctl"><div class="lab"><label for="learn">Learning depth Λ</label><output id="learnVal"></output></div><input type="range" id="learn" min="0" max="1" step="0.01" value="0.6"></div>
+          <div class="ctl"><div class="lab"><label for="crave">Craving after bliss</label><output id="craveVal"></output></div><input type="range" id="crave" min="0" max="0.12" step="0.005" value="0.03"></div>
+          <div class="ctl"><div class="lab"><label for="events">Life events per 100 time units</label><output id="eventsVal"></output></div><input type="range" id="events" min="0" max="20" step="0.5" value="5"></div>
+          <div class="ctl"><div class="lab"><label for="lifeAnti">Antidotes life offers, per knot per 100 units</label><output id="lifeAntiVal"></output></div><input type="range" id="lifeAnti" min="0" max="8" step="0.1" value="2"></div>
+          <div class="row"><button class="btn" id="replayBtn">Replay this life</button><button class="btn" id="newLifeBtn">A different life</button></div>
+        </fieldset>
+        <fieldset>
+          <legend>Many lives</legend>
+          <p class="note">Run 200 lives with the settings above, each with different events, and see when (or whether) each one reaches the zero-state.</p>
+          <div class="row"><button class="btn" id="batchBtn">Run 200 lives</button><span class="note" id="batchNote"></span></div>
+          <div class="chart" id="batchWrap" hidden><canvas id="batchCanvas" height="150" aria-label="Histogram of age at reaching the zero-state"></canvas><div class="tip" id="batchTip"></div></div>
+        </fieldset>
+      </div>
+
+      <!-- II. POPULATION -->
+      <div class="panel" data-panel="population" hidden>
+        <p class="eyebrow">Scale II · 40,962 people on a world</p>
+        <h2>Zero-points in a population</h2>
+        <p class="lede">Each point on the planet is one person&rsquo;s dominant knot. A person&rsquo;s environment is mostly their neighbours, so each psyche is pulled toward the average of the psyches around it. Where the phase winds once around a loop (reaching, rising, resisting, falling), the field has to pass through <b>zero</b> inside it. Those still points are the eyes of the spiral waves.</p>
+        <div class="eq">ż<sub>i</sub> = f(z<sub>i</sub>) + K(1 + iα)(⟨z⟩<sub>nbrs</sub> − z<sub>i</sub>) − d<sub>i</sub> z<sub>i</sub><small>f is the same knot law as Scale I · d<sub>i</sub> is dampening near a teacher</small></div>
+        <dl class="readouts">
+          <div><dt>Zero-points</dt><dd id="qCount">0</dd></div>
+          <div><dt>Net charge</dt><dd id="qNet">0</dd></div>
+          <div><dt>Ego gain μ</dt><dd id="qMu">0.20</dd></div>
+          <div><dt>Mean |z|</dt><dd id="qAmp">0.00</dd></div>
+          <div><dt>In zero-state</dt><dd id="qZero">0%</dd></div>
+          <div><dt>Regime</dt><dd id="qRegime"><span class="pill attach">attaching</span></dd></div>
+        </dl>
+        <p class="note">Clockwise and anticlockwise zero-points are born and die in pairs, so the net charge over the whole world is always exactly 0.</p>
+        <figure>
+          <figcaption><span>History</span><span id="popNote"></span></figcaption>
+          <div class="chart" id="popWrap"><canvas id="popCanvas" height="150" aria-label="Zero-point count and zero-state fraction over time"></canvas><div class="tip" id="popTip"></div></div>
+        </figure>
+        <fieldset>
+          <legend>Collective settings</legend>
+          <div class="ctl"><div class="lab"><label for="pmu">Collective ego gain μ</label><output id="pmuVal"></output></div><input type="range" id="pmu" min="-0.3" max="0.3" step="0.005" value="0.2"><span class="hint">Try −0.05. A world with zero-points lets the zero-state spread from them; press <b>Synchronise everyone</b> first and the same μ changes nothing.</span></div>
+          <div class="ctl"><div class="lab"><label for="pbeta">Rhythm shift β</label><output id="pbetaVal"></output></div><input type="range" id="pbeta" min="0" max="1.5" step="0.05" value="0.8"><span class="hint">How much a knot&rsquo;s intensity changes its tempo. β = 0 gives still vortices; larger β winds them into spirals.</span></div>
+          <div class="ctl"><div class="lab"><label for="palpha">Mirror twist α</label><output id="palphaVal"></output></div><input type="range" id="palpha" min="-1" max="1" step="0.05" value="0"><span class="hint">How much the phase turns when it passes from person to person.</span></div>
+          <div class="ctl"><div class="lab"><label for="pevents">Life events per 100 time units</label><output id="peventsVal"></output></div><input type="range" id="pevents" min="0" max="100" step="1" value="0"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Experiments</legend>
+          <div class="ctl"><div class="lab"><label for="ptq">Time for the ego to switch on</label><output id="ptqVal"></output></div><input type="range" id="ptq" min="4" max="200" step="1" value="10"></div>
+          <div class="row"><button class="btn strong" id="quenchBtn">Birth of the ego</button><button class="btn" id="syncBtn">Synchronise everyone</button></div>
+          <p class="note">The birth ramps μ from −0.1 to +0.2 over the chosen time. Slow births leave fewer zero-points; the count falls roughly as time<sup>−½</sup>.</p>
+          <div class="row"><button class="btn" id="guruBtn" aria-pressed="true">Tap to place a teacher: on</button><button class="btn" id="clearGuruBtn">Clear teachers</button></div>
+          <p class="note">A teacher is a person pinned at z = 0 who damps the people around them (the paper&rsquo;s <i>dampening</i>).</p>
+        </fieldset>
+      </div>
+
+      <!-- III. UNIVERSE -->
+      <div class="panel" data-panel="universe" hidden>
+        <p class="eyebrow">Scale III · one field filling space</p>
+        <h2>Knots made of stillness</h2>
+        <p class="lede">Let the population become a continuum filling three dimensions. The zero-states are no longer points but <b>closed lines</b>, and the waves of reaching and resisting turn around them. These lines can tie into knots and link through each other. Under positive feedback they tighten, reconnect and vanish. Under negative feedback the zero-state swells out from them.</p>
+        <div class="eq">∂z/∂t = f(z) + (1 + iα)∇²z<small>cubic–quintic complex Ginzburg–Landau equation on a periodic cube</small></div>
+        <dl class="readouts">
+          <div><dt>Zero-loops</dt><dd id="uLoops">0</dd></div>
+          <div><dt>Line length</dt><dd id="uLen">0</dd></div>
+          <div><dt>Linking</dt><dd id="uLk">–</dd></div>
+          <div><dt>Ego gain μ</dt><dd id="uMu">0.20</dd></div>
+          <div><dt>In zero-state</dt><dd id="uZero">0%</dd></div>
+          <div><dt>Regime</dt><dd id="uRegime"><span class="pill attach">attaching</span></dd></div>
+        </dl>
+        <figure>
+          <figcaption><span>History</span><span id="uniNote"></span></figcaption>
+          <div class="chart" id="uniWrap"><canvas id="uniCanvas" height="150" aria-label="Zero-line length and zero-state fraction over time"></canvas><div class="tip" id="uniTip"></div></div>
+        </figure>
+        <fieldset>
+          <legend>Begin a universe</legend>
+          <div class="row">
+            <button class="btn" id="seedBang">Big bang</button>
+            <button class="btn" id="seedTrefoil">Trefoil knot</button>
+            <button class="btn" id="seedHopf">Hopf link</button>
+            <button class="btn" id="seedRing">Single ring</button>
+          </div>
+          <p class="note"><b>Big bang</b> gives every small region its own random phase, the way the early universe froze in cosmic strings. The knot seeds place the zero-set exactly on a trefoil, two linked rings, or one ring.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Field settings</legend>
+          <div class="ctl"><div class="lab"><label for="umu">Collective ego gain μ</label><output id="umuVal"></output></div><input type="range" id="umu" min="-0.3" max="0.3" step="0.005" value="0.2"><span class="hint">Below 0, watch the zero-state spread out along the lines.</span></div>
+          <div class="ctl"><div class="lab"><label for="ubeta">Rhythm shift β</label><output id="ubetaVal"></output></div><input type="range" id="ubeta" min="0" max="1.5" step="0.05" value="0.8"></div>
+          <div class="row">
+            <button class="btn sm" id="showLines" aria-pressed="true">Zero-lines</button>
+            <button class="btn sm" id="showCloud" aria-pressed="true">Zero-state glow</button>
+            <button class="btn sm" id="showSlice" aria-pressed="true">Phase slice</button>
+          </div>
+          <div class="ctl"><div class="lab"><label for="uslice">Slice depth</label><output id="usliceVal"></output></div><input type="range" id="uslice" min="0" max="1" step="0.01" value="0.5"></div>
+        </fieldset>
+      </div>
+    </aside>
+  </main>
+
+  <article class="notes" id="notes" hidden>
+    <div class="wrap" id="notesWrap">
+      <p class="eyebrow">What emerged</p>
+      <h2>Running the wave model</h2>
+      <p class="intro">The paper describes knots, a mirror, an ego that switches feedback, and a zero-state. Written as equations and run, those four ideas make one specific dynamical system. At the scale of a population or a universe it produces geometry the paper doesn&rsquo;t mention: points and lines of stillness that come in pairs, knot together, and act as the seeds from which release spreads.</p>
+
+      <h3>From the paper to equations</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>In the paper</th><th>In the model</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td>Psychological knot</td><td class="m">z = |z| e<sup>iφ</sup></td><td>|z| is intensity. Re z &gt; 0 is reaching (the crest), Re z &lt; 0 is resisting (the trough).</td></tr>
+          <tr><td>A feeling rises and falls</td><td class="m">rotation at ω</td><td>Each knot keeps turning through reaching, rising, resisting and falling.</td></tr>
+          <tr><td>Environment as mirror</td><td class="m">returns ρz</td><td>What is inside comes back from outside.</td></tr>
+          <tr><td>Ego as feedback switcher</td><td class="m">μ = ρg − γ</td><td>g &gt; 0 meets the mirror in phase (amplify); g &lt; 0 meets it out of phase (resolve). μ is the net gain.</td></tr>
+          <tr><td>Accumulation, attachment</td><td class="m">stable cycle at r<sub>s</sub></td><td>The knot sustains itself: the cyclical pattern between psyche and environment.</td></tr>
+          <tr><td>Knots beyond a threshold are hard to resolve</td><td class="m">unstable cycle at r<sub>u</sub></td><td>Below r<sub>u</sub> a knot falls to zero once μ &lt; 0; above it, the knot stays.</td></tr>
+          <tr><td>Compensation</td><td class="m">z → (1 − αe<sup>iδ</sup>) z</td><td>An opposite-phase wave of dose α, aimed δ away from the knot&rsquo;s root.</td></tr>
+          <tr><td>Dampening</td><td class="m">−d z</td><td>Coupling to someone at z = 0 lowers your effective μ.</td></tr>
+          <tr><td>Bliss</td><td class="m">Σ M<sub>k</sub> e<sup>−|z<sub>k</sub>|²/ε²</sup></td><td>Proportional to the amplitude that was resolved (M) and to the time spent near zero.</td></tr>
+          <tr><td>Resolution teaches</td><td class="m">μ₀ − Λ(1 − e<sup>−W/60</sup>)</td><td>W = ∫ bliss dt. Each release tilts the ego toward negative feedback and sharpens its aim.</td></tr>
+          <tr><td>Bliss invites repetition</td><td class="m">craving c<sub>k</sub></td><td>A short-lived rise in μ for the knot that just gave bliss: the route to addiction.</td></tr>
+          <tr><td>Humans as nodes in a larger system</td><td class="m">K(⟨z⟩ − z<sub>i</sub>)</td><td>Your environment is mostly other people&rsquo;s psyches.</td></tr>
+          <tr><td>A global field</td><td class="m">∂z/∂t = f(z) + (1 + iα)∇²z</td><td>The continuum limit: the cubic–quintic complex Ginzburg–Landau equation.</td></tr>
+        </tbody>
+      </table></div>
+      <p>The knot law <em class="m">f(z) = (μ + iω)z + (1 + iβ)|z|²z − |z|⁴z</em> is the normal form of a <b>subcritical Hopf bifurcation</b>, the simplest equation in which an oscillation can switch on abruptly and then refuse to switch off. I chose it because it is the smallest law that reproduces the paper&rsquo;s claims together: amplification, a threshold, a flip after release, and release that needs several cycles.</p>
+
+      <h3><span class="n">1</span>The ego works as a bifurcation parameter</h3>
+      <p>For <em class="m">μ &gt; 0</em> every knot, however small, grows to the attachment cycle. For <em class="m">−¼ &lt; μ &lt; 0</em> the zero-state and attachment coexist: small knots dissolve, large ones persist. Below <em class="m">μ = −¼</em> every knot dissolves. None of the paper&rsquo;s behaviours had to be added by hand. A compensation that overshoots rotates the knot past 90°, so a reaching knot comes back as a smaller resisting one (Fig. 9). A deep knot pushed only part of the way down climbs back to attachment, so it needs several cycles (Accumulation section). There is also <b>hysteresis</b>: once a knot has reached zero, it stays there until μ climbs all the way back above 0.</p>
+
+      <h3><span class="n">2</span>Aim matters more than dose</h3>
+      <p>An antidote multiplies the knot by <em class="m">1 − αe<sup>iδ</sup></em>. It helps only when <em class="m">cos δ &gt; α/2</em>. A full-strength antidote (α = 1) aimed more than <b>60°</b> away from the root leaves the knot <b>larger</b> than before. Gentler doses tolerate more error, which fits the paper&rsquo;s observation from exposure therapy that release is easier at low intensity. This is the arithmetic behind its point that finding the root cause matters most.</p>
+      <div class="fig">
+        <div class="keys"><span><i style="--c: var(--chart-a)"></i>α = 1.0</span><span><i style="--c: var(--chart-b)"></i>α = 0.5</span><span><i class="dash" style="--c: var(--ink-3)"></i>no change</span></div>
+        <div class="chart"><svg id="figAim" viewBox="0 0 700 250" role="img" aria-label="Knot size after an antidote against aim error"></svg><div class="tip" id="figAimTip"></div></div>
+        <p class="cap"><b>Knot size after one antidote</b>, as a multiple of its size before, against aim error δ. Above the dashed line the antidote made things worse.</p>
+      </div>
+
+      <h3><span class="n">3</span>Release arrives as a cascade</h3>
+      <p>Each release lowers μ and sharpens aim, which makes the next release easier. That feedback makes lives in the model hold at attachment for a long time and then fall through the threshold in a short burst, rather than decline gradually. With the default settings, 76 of 200 simulated lives reached the zero-state, at a median of 81% of the lifespan; the rest died still attached. <b>Run 200 lives</b> on the Psyche tab reproduces this, and shows how the settings move the split. Seen from above, a knot&rsquo;s track spirals outward while it accumulates, zigzags across the axis as antidotes arrive, and settles onto the straight line of the axis: the loops, zigzag and line of the unalome the paper mentions.</p>
+
+      <h3><span class="n">4</span>Zero-states become topological defects</h3>
+      <p>When psyches are coupled to their neighbours, a person&rsquo;s phase has to vary smoothly across the population. Around some closed loops the phase winds once through reaching, rising, resisting and falling. A continuous field that winds like that must pass through <em class="m">z = 0</em> inside the loop, so a zero-point sits there. It cannot be removed by any local change. Zero-points come in two handednesses and are created and destroyed only in opposite pairs, so on a closed world the net charge is always exactly zero. Your duality of reaching and resisting shows up at this scale as a conservation law. The spiral waves on the planet are everyone&rsquo;s knots circulating around these still points.</p>
+
+      <h3><span class="n">5</span>Release spreads from the zero-points</h3>
+      <p>This was the result I didn&rsquo;t expect. Take a world in the bistable band (−¼ &lt; μ &lt; 0). If everyone is in sync and there is no zero-point anywhere, attachment holds all the way down to μ = −¼, because the zero-state has nowhere to start. If the world contains zero-points, the zero-state grows outward from them and takes over the planet at a much higher μ. How much higher depends on the rhythm shift β. With β = 0, release starts near μ ≈ −0.2, close to the Maxwell point −3/16 where the two states are equally stable. From β ≈ 0.75 upward, any negative gain is enough. The zero-points act as nucleation sites. A population with a variety of phases can reach the zero-state at a higher ego gain than a synchronised one.</p>
+      <div class="fig">
+        <div class="keys"><span><i style="--c: var(--chart-a)"></i>world with zero-points</span><span><i class="dash" style="--c: var(--chart-b)"></i>synchronised world (no zero-points)</span></div>
+        <div class="chart"><svg id="figThresh" viewBox="0 0 700 300" role="img" aria-label="Collective ego gain at which the zero-state takes over, against rhythm shift"></svg><div class="tip" id="figThreshTip"></div></div>
+        <p class="cap"><b>Highest collective ego gain at which the zero-state takes over</b>, measured on a 128 × 128 periodic grid run for 400–500 time units. Bars span the last μ tested where it took over and the first where it did not.</p>
+      </div>
+
+      <h3><span class="n">6</span>A fast birth of the ego leaves more still points</h3>
+      <p>Start a population at zero and ramp μ through 0 over a time τ: the ego switching on across a whole society. Separate regions choose their phases independently, and zero-points freeze in where the choices disagree. Measured over six ramp times from 32 to 1024 units, the number of zero-points left behind falls as <em class="m">τ<sup>−0.52</sup></em>. Mean-field theory predicts <em class="m">τ<sup>−½</sup></em>. This is the Kibble–Zurek law, first worked out for defects frozen into the early universe and later checked in superfluid helium. A fast, disordered birth leaves a world with more nucleation sites for release.</p>
+      <div class="fig">
+        <div class="keys"><span><i style="--c: var(--chart-a)"></i>measured (mean of 4 runs, ±1 s.d.)</span><span><i style="--c: var(--chart-a)"></i>fit, slope −0.52</span><span><i class="dash" style="--c: var(--ink-3)"></i>theory, slope −½</span></div>
+        <div class="chart"><svg id="figKZ" viewBox="0 0 700 280" role="img" aria-label="Zero-points left behind against the time taken for the ego to switch on, log-log"></svg><div class="tip" id="figKZTip"></div></div>
+        <p class="cap"><b>Zero-points frozen in</b> on a 256 × 256 world against the time taken for the ego to switch on. Both axes logarithmic.</p>
+      </div>
+
+      <h3><span class="n">7</span>In three dimensions, the knots are made of stillness</h3>
+      <p>In a field filling space, the zero-set is a set of closed curves, and those curves can knot and link. Seeding the field so that the zero-set is two linked rings gives a Gauss linking number of −1.000 when measured on the simulated lines, and a trefoil seed gives a single knotted loop. So the paper&rsquo;s knots come back at the largest scale as literal knots, but made of zero-state, with the waves of reaching and resisting circulating around them. Under positive feedback the lines behave like strings under tension: they tighten, reconnect and disappear, leaving a uniform field with no stillness in it. Reconnection is how these knots untie. The Hopf link merges into one loop within a few time units, then splits into two unlinked rings, and its linking number drops from −1 to 0. Under negative feedback the zero-state grows outward along the lines as tubes and fills the space. A uniform field with no lines, at the same μ = −0.05, doesn&rsquo;t change.</p>
+
+      <div class="callout"><p>The same equation governs spiral waves in the Belousov–Zhabotinsky reaction and in heart tissue, quantised vortex lines in superfluids, and the cosmic strings proposed for the early universe. The paper cites the Hermetic principle &ldquo;as above, so below&rdquo;. Here it has a precise form: near the point where an oscillation switches on, any system of waves with feedback and neighbours reduces to this equation, whatever the waves are made of.</p></div>
+
+      <h3>Which parts are my modelling choices</h3>
+      <ul>
+        <li>The paper doesn&rsquo;t give dynamics, so the knot law is my choice. A supercritical (smooth) Hopf law would keep the amplification and the flip but lose the threshold and the hysteresis.</li>
+        <li>The rules for bliss, learning, craving, and the antidotes life offers are one reading of the text. Different forms move the numbers in findings 3 and 6. They do not change the geometry in findings 4, 5 and 7.</li>
+        <li>That geometry is <b>universal</b>: it follows from waves plus feedback plus neighbours, and doesn&rsquo;t depend on what the waves are. That makes the argument structurally sound. It is not evidence that psyches work this way. Testing that would need measurements of the kind the paper&rsquo;s future-work section proposes.</li>
+        <li>The model makes predictions that could in principle be tested: hysteresis between attachment and release, an aim tolerance of arccos(α/2) for interventions, release that comes as a cascade rather than a slope, and release that spreads faster through a population with more variety of phase than through a synchronised one.</li>
+      </ul>
+
+      <h3>How the simulations run</h3>
+      <p>Euler time-stepping, with the |z|⁴ term treated implicitly for stability. One psyche: seven knots, dt = 0.05, life = 600 time units. Population: a geodesic sphere of 40,962 vertices with graph-Laplacian coupling. Universe: a 48³ periodic grid (40³ on small screens). Zero-points are the triangles or grid plaquettes around which the phase winds by ±2π. Zero-lines join pierced plaquettes cube by cube. Knot seeds use the zero-set of u² − v³ (trefoil) and u² − v² (Hopf link) on the 3-sphere, projected into space. Linking numbers use the exact segment-pair Gauss integral. The figures on this page come from separate runs of the same equations in NumPy.</p>
+      <ol class="refs">
+        <li>Rasheed, F. <i>A wave model of interaction between the psyche and environment.</i> Preprint, IIT Hyderabad.</li>
+        <li>Kuznetsov, Y. A. <i>Elements of Applied Bifurcation Theory</i>, ch. 8 (Bautin bifurcation). Springer.</li>
+        <li>Aranson, I. S. &amp; Kramer, L. The world of the complex Ginzburg–Landau equation. <i>Rev. Mod. Phys.</i> 74, 99 (2002).</li>
+        <li>Kibble, T. W. B. Topology of cosmic domains and strings. <i>J. Phys. A</i> 9, 1387 (1976). Zurek, W. H. Cosmological experiments in superfluid helium? <i>Nature</i> 317, 505 (1985).</li>
+        <li>Winfree, A. T. &amp; Strogatz, S. H. Organizing centres for three-dimensional chemical waves. <i>Nature</i> 311, 611 (1984).</li>
+        <li>Dennis, M. R., King, R. P., Jack, B., O&rsquo;Holleran, K. &amp; Padgett, M. J. Isolated optical vortex knots. <i>Nature Physics</i> 6, 118 (2010).</li>
+        <li>Klenin, K. &amp; Langowski, J. Computation of writhe in modeling of supercoiled DNA. <i>Biopolymers</i> 54, 307 (2000).</li>
+      </ol>
+    </div>
+  </article>
+</div>
+<script type="module">
+// ===== Wave-model core: the mathematics =====
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng) { let u = 0, v = 0; while (u === 0) u = rng(); v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+const rAttach = mu => Math.sqrt(Math.max(0, (1 + Math.sqrt(Math.max(0, 1 + 4 * mu))) / 2)); // stable 'attachment' radius
+const rThresh = mu => (mu >= 0 ? 0 : mu < -0.25 ? NaN : Math.sqrt((1 - Math.sqrt(1 + 4 * mu)) / 2)); // unstable threshold
+
+// ---------------- I. One psyche ----------------
+class Psyche {
+  constructor(K = 7) { this.K = K; this.p = { mu0: 0.10, learn: 0.6, crave: 0.03, events: 0.05, lifeAnti: 0.02, presence: 0, beta: 0.2, dose: 1.0, aim: 15 }; this.T = 600; this.Ws = 60; this.reset(11); }
+  reset(seed) {
+    const K = this.K; this.seed = seed; this.rng = mulberry32(seed);
+    this.t = 0; this.W = 0; this.z = []; this.w = []; this.M = new Float64Array(K); this.c = new Float64Array(K);
+    this.bk = new Float64Array(K); this.bliss = 0; this.flips = 0; this.resolutions = 0; this.log = [];
+    const ws = []; for (let k = 0; k < K; k++) ws.push(0.12 + 0.33 * k / (K - 1));
+    for (let k = K - 1; k > 0; k--) { const j = Math.floor(this.rng() * (k + 1)); [ws[k], ws[j]] = [ws[j], ws[k]]; }
+    for (let k = 0; k < K; k++) {
+      const a = 0.2 * (0.3 + 0.7 * this.rng()), th = 2 * Math.PI * this.rng(); // inherited knots
+      this.z.push([a * Math.cos(th), a * Math.sin(th)]); this.w.push(ws[k]);
+    }
+  }
+  muBase() { return this.p.mu0 - this.p.learn * (1 - Math.exp(-this.W / this.Ws)) - this.p.presence; }
+  muK(k) { return this.muBase() + this.c[k]; }
+  ego() { let s = 0; for (const [x, y] of this.z) s += x * x + y * y; return s; } // I = <psi, mirror> ~ sum |z|^2
+  compensate(k, dose, aimRad) { // antidote: send an opposite-phase wave  z <- z - dose e^{i aim} z
+    const [x, y] = this.z[k], c = Math.cos(aimRad), s = Math.sin(aimRad);
+    const nx = x - dose * (c * x - s * y), ny = y - dose * (s * x + c * y);
+    if (x * nx < 0 && Math.hypot(nx, ny) > 0.05) this.flips++;
+    this.z[k] = [nx, ny]; this.resolutions++;
+  }
+  strongest() { let b = 0, bi = 0; this.z.forEach(([x, y], i) => { const r = x * x + y * y; if (r > b) { b = r; bi = i; } }); return bi; }
+  kick(kind) { // 'trauma' (resisting) or 'desire' (reaching)
+    const k = Math.floor(this.rng() * this.K), A = kind === 'trauma' ? 1.1 : 0.7, th = (kind === 'trauma' ? Math.PI : 0) + 0.3 * gauss(this.rng);
+    this.z[k][0] += A * Math.cos(th); this.z[k][1] += A * Math.sin(th); return k;
+  }
+  step(dt) {
+    const p = this.p, K = this.K, rng = this.rng;
+    for (let k = 0; k < K; k++) {
+      const [x, y] = this.z[k], a2 = x * x + y * y, mu = this.muK(k), w = this.w[k];
+      const fx = mu * x - w * y + (x - p.beta * y) * a2, fy = mu * y + w * x + (y + p.beta * x) * a2, q = 1 + dt * a2 * a2; // quintic term semi-implicit
+      this.z[k] = [(x + dt * fx) / q, (y + dt * fy) / q];
+    }
+    if (rng() < p.events * dt) { // life events create or deepen knots
+      const k = Math.floor(rng() * K), A = Math.min(1.2, -Math.log(1 - rng()) * 0.4), th = (rng() < 0.5 ? 0 : Math.PI) + 0.5 * gauss(rng);
+      this.z[k][0] += A * Math.cos(th); this.z[k][1] += A * Math.sin(th);
+    }
+    for (let k = 0; k < K; k++) { // the environment offers antidotes; the ego accepts some
+      const r = Math.hypot(this.z[k][0], this.z[k][1]);
+      if (r > 0.3 && rng() < p.lifeAnti * dt) {
+        const accept = 0.25 + 0.75 * (1 - Math.exp(-this.W / this.Ws));
+        if (rng() < accept) this.compensate(k, 0.7 + 0.6 * rng(), gauss(rng) * 0.7 * Math.exp(-this.W / this.Ws));
+      }
+    }
+    let b = 0; const eps = 0.25;
+    for (let k = 0; k < K; k++) { // bliss ~ (amplitude resolved) x (time near zero)
+      const r = Math.hypot(this.z[k][0], this.z[k][1]), ker = Math.exp(-((r / eps) ** 2));
+      this.M[k] = Math.max(this.M[k] * Math.exp(-dt * ker / 10), r > eps ? r : 0);
+      this.bk[k] = this.M[k] * ker; b += this.bk[k];
+      this.c[k] += dt * (p.crave * this.bk[k] - this.c[k] / 30); // craving: bliss invites repetition
+    }
+    this.bliss = b; this.W += b * dt; this.t += dt;
+  }
+}
+
+// ---------------- II. Population on a sphere ----------------
+function icosphere(level) {
+  const t = (1 + Math.sqrt(5)) / 2;
+  let V = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]];
+  let F = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+  const norm = v => { const l = Math.hypot(...v); return [v[0] / l, v[1] / l, v[2] / l]; };
+  V = V.map(norm);
+  for (let l = 0; l < level; l++) {
+    const cache = new Map(), NF = [];
+    const mid = (a, b) => { const key = a < b ? a * 1e6 + b : b * 1e6 + a; let m = cache.get(key); if (m === undefined) { m = V.length; V.push(norm([(V[a][0] + V[b][0]) / 2, (V[a][1] + V[b][1]) / 2, (V[a][2] + V[b][2]) / 2])); cache.set(key, m); } return m; };
+    for (const [a, b, c] of F) { const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a); NF.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]); }
+    F = NF;
+  }
+  const n = V.length, nb = Array.from({ length: n }, () => new Set());
+  for (const [a, b, c] of F) { nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b); }
+  const off = new Int32Array(n + 1), list = [];
+  for (let i = 0; i < n; i++) { off[i] = list.length; for (const j of nb[i]) list.push(j); }
+  off[n] = list.length;
+  return { V, F, off, nbr: Int32Array.from(list) };
+}
+
+const wrapPi = d => d - 2 * Math.PI * Math.round(d / (2 * Math.PI));
+
+class Population {
+  constructor(level = 5) {
+    this.g = icosphere(level); const n = this.n = this.g.V.length;
+    this.re = new Float32Array(n); this.im = new Float32Array(n); this.re2 = new Float32Array(n); this.im2 = new Float32Array(n);
+    this.damp = new Float32Array(n); this.pin = new Uint8Array(n); this.gurus = [];
+    this.p = { mu: 0.2, beta: 0.8, alpha: 0, K: 4, w: 0, events: 0, noise: 0 };
+    this.t = 0; this.rng = mulberry32(7); this.ramp = null;
+  }
+  noise(a = 1e-3) { for (let i = 0; i < this.n; i++) { this.re[i] = a * gauss(this.rng); this.im[i] = a * gauss(this.rng); } }
+  synchronize() { const r = rAttach(this.p.mu); for (let i = 0; i < this.n; i++) { this.re[i] = r + 0.01 * gauss(this.rng); this.im[i] = 0.01 * gauss(this.rng); } }
+  quench(tq, target) { this.noise(1e-3); this.ramp = { t0: this.t, tq, from: -0.1, to: target }; this.p.mu = -0.1; }
+  addGuru(i) {
+    const V = this.g.V; this.gurus.push(i); this.pin[i] = 1;
+    for (let j = 0; j < this.n; j++) { const d = Math.acos(Math.min(1, V[i][0] * V[j][0] + V[i][1] * V[j][1] + V[i][2] * V[j][2])); this.damp[j] += 0.5 * Math.exp(-((d / 0.12) ** 2)); }
+  }
+  clearGurus() { this.gurus = []; this.pin.fill(0); this.damp.fill(0); }
+  event() { // a life event: a local wave packet with random phase
+    const V = this.g.V, i = Math.floor(this.rng() * this.n), A = 0.6 + 0.8 * this.rng(), th = 2 * Math.PI * this.rng();
+    for (let j = 0; j < this.n; j++) { const d = Math.acos(Math.min(1, V[i][0] * V[j][0] + V[i][1] * V[j][1] + V[i][2] * V[j][2])); if (d < 0.2) { const g = A * Math.exp(-((d / 0.07) ** 2)); this.re[j] += g * Math.cos(th); this.im[j] += g * Math.sin(th); } }
+  }
+  step(dt) {
+    const { off, nbr } = this.g, n = this.n, p = this.p, re = this.re, im = this.im, R = this.re2, I = this.im2;
+    if (this.ramp) { const f = (this.t - this.ramp.t0) / this.ramp.tq; p.mu = this.ramp.from + (this.ramp.to - this.ramp.from) * Math.min(1, f); if (f >= 1) this.ramp = null; }
+    const K = p.K, al = p.alpha, b = p.beta, w = p.w;
+    for (let i = 0; i < n; i++) {
+      if (this.pin[i]) { R[i] = 0; I[i] = 0; continue; }
+      let sr = 0, si = 0; const o0 = off[i], o1 = off[i + 1];
+      for (let o = o0; o < o1; o++) { const j = nbr[o]; sr += re[j]; si += im[j]; }
+      const x = re[i], y = im[i], inv = 1 / (o1 - o0), lr = sr * inv - x, li = si * inv - y, a2 = x * x + y * y, mu = p.mu - this.damp[i];
+      const fx = mu * x - w * y + (x - b * y) * a2 + K * (lr - al * li);
+      const fy = mu * y + w * x + (y + b * x) * a2 + K * (li + al * lr), q = 1 / (1 + dt * a2 * a2);
+      R[i] = (x + dt * fx) * q; I[i] = (y + dt * fy) * q;
+    }
+    this.re = R; this.im = I; this.re2 = re; this.im2 = im; this.t += dt;
+    if (p.events > 0 && this.rng() < p.events * dt) this.event();
+    if (p.noise > 0) for (let i = 0; i < n; i++) { this.re[i] += p.noise * Math.sqrt(dt) * gauss(this.rng); this.im[i] += p.noise * Math.sqrt(dt) * gauss(this.rng); }
+  }
+  // winding number of the phase around every triangle: the zero-points
+  charges(minAmp = 0.08) {
+    const F = this.g.F, re = this.re, im = this.im, pos = [], neg = []; let net = 0;
+    const ph = new Float32Array(this.n); for (let i = 0; i < this.n; i++) ph[i] = Math.atan2(im[i], re[i]);
+    for (let f = 0; f < F.length; f++) {
+      const [a, b, c] = F[f];
+      const s = wrapPi(ph[b] - ph[a]) + wrapPi(ph[c] - ph[b]) + wrapPi(ph[a] - ph[c]);
+      const q = Math.round(s / (2 * Math.PI)); if (!q) continue; net += q;
+      const amp = (Math.hypot(re[a], im[a]) + Math.hypot(re[b], im[b]) + Math.hypot(re[c], im[c])) / 3;
+      if (amp < minAmp) continue;
+      (q > 0 ? pos : neg).push(f);
+    }
+    return { pos, neg, net };
+  }
+  stats() { let s = 0, z = 0; const r = rAttach(Math.max(this.p.mu, -0.25)); for (let i = 0; i < this.n; i++) { const a = Math.hypot(this.re[i], this.im[i]); s += a; if (a < 0.5 * r) z++; } return { mean: s / this.n, zeroFrac: z / this.n }; }
+}
+
+// ---------------- III. Universe: 3D field ----------------
+class Universe {
+  constructor(N = 48) {
+    this.N = N; const n = this.n = N * N * N;
+    this.re = new Float32Array(n); this.im = new Float32Array(n); this.re2 = new Float32Array(n); this.im2 = new Float32Array(n);
+    this.p = { mu: 0.2, beta: 0.8, alpha: 0, D: 1, w: 0 }; this.t = 0; this.rng = mulberry32(3); this.ramp = null;
+    this.xp = new Int32Array(N); this.xm = new Int32Array(N);
+    for (let i = 0; i < N; i++) { this.xp[i] = (i + 1) % N; this.xm[i] = (i - 1 + N) % N; }
+    this.Wx = new Int8Array(n); this.Wy = new Int8Array(n); this.Wz = new Int8Array(n); this.ph = new Float32Array(n);
+  }
+  idx(x, y, z) { return x + this.N * (y + this.N * z); }
+  quench(tq = 20, target = 0.2) { for (let i = 0; i < this.n; i++) { this.re[i] = 1e-3 * gauss(this.rng); this.im[i] = 1e-3 * gauss(this.rng); } this.ramp = { t0: this.t, tq, from: -0.1, to: target }; this.p.mu = -0.1; }
+  bigBang(domain = 3) { // Kibble mechanism: causally separate domains pick independent phases
+    const N = this.N, n = this.n, NN = N * N, xp = this.xp, xm = this.xm, r0 = rAttach(Math.max(this.p.mu, 0.05));
+    let re = this.re, im = this.im, R = this.re2, I = this.im2;
+    for (let i = 0; i < n; i++) { re[i] = gauss(this.rng); im[i] = gauss(this.rng); }
+    const steps = Math.round(domain * domain * 1.5);
+    for (let s = 0; s < steps; s++) { // pure diffusion sets the domain size
+      for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const i = x + N * y + NN * z;
+        R[i] = re[i] + 0.15 * (re[xp[x] + N * y + NN * z] + re[xm[x] + N * y + NN * z] + re[x + N * xp[y] + NN * z] + re[x + N * xm[y] + NN * z] + re[x + N * y + NN * xp[z]] + re[x + N * y + NN * xm[z]] - 6 * re[i]);
+        I[i] = im[i] + 0.15 * (im[xp[x] + N * y + NN * z] + im[xm[x] + N * y + NN * z] + im[x + N * xp[y] + NN * z] + im[x + N * xm[y] + NN * z] + im[x + N * y + NN * xp[z]] + im[x + N * y + NN * xm[z]] - 6 * im[i]);
+      }
+      [re, R] = [R, re]; [im, I] = [I, im];
+    }
+    let mean = 0; for (let i = 0; i < n; i++) mean += Math.hypot(re[i], im[i]); mean /= n;
+    for (let i = 0; i < n; i++) { const m = Math.hypot(re[i], im[i]) || 1e-9, a = r0 * Math.tanh(1.5 * m / mean); re[i] *= a / m; im[i] *= a / m; }
+    this.re = re; this.im = im; this.re2 = R; this.im2 = I; this.ramp = null;
+  }
+  // Milnor-style seeds: zero set of u^p - v^q on S^3, stereographically projected (Dennis et al. 2010)
+  seedKnot(kind, scale) {
+    const N = this.N, c = (N - 1) / 2, s = scale || N * 0.2, r0 = rAttach(this.p.mu);
+    for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const X = (x - c) / s, Y = (y - c) / s, Z = (z - c) / s, r2 = X * X + Y * Y + Z * Z, d = r2 + 1;
+      const ur = (r2 - 1) / d, ui = 2 * Z / d, vr = 2 * X / d, vi = 2 * Y / d;
+      let fr, fi;
+      if (kind === 'ring') { fr = ur; fi = ui; }
+      else if (kind === 'hopf') { const a = [ur * ur - ui * ui, 2 * ur * ui], b = [vr * vr - vi * vi, 2 * vr * vi]; fr = a[0] - b[0]; fi = a[1] - b[1]; }
+      else { // trefoil: u^2 - v^3
+        const u2 = [ur * ur - ui * ui, 2 * ur * ui], v2 = [vr * vr - vi * vi, 2 * vr * vi], v3 = [v2[0] * vr - v2[1] * vi, v2[0] * vi + v2[1] * vr];
+        fr = u2[0] - v3[0]; fi = u2[1] - v3[1];
+      }
+      const m = Math.hypot(fr, fi), amp = r0 * Math.tanh(m / 0.12);
+      const i = this.idx(x, y, z); this.re[i] = m > 1e-9 ? amp * fr / m : 0; this.im[i] = m > 1e-9 ? amp * fi / m : 0;
+    }
+    this.ramp = null;
+  }
+  step(dt) {
+    const N = this.N, p = this.p, re = this.re, im = this.im, R = this.re2, I = this.im2, xp = this.xp, xm = this.xm, NN = N * N;
+    if (this.ramp) { const f = (this.t - this.ramp.t0) / this.ramp.tq; p.mu = this.ramp.from + (this.ramp.to - this.ramp.from) * Math.min(1, f); if (f >= 1) this.ramp = null; }
+    const mu = p.mu, b = p.beta, al = p.alpha, D = p.D, w = p.w;
+    for (let z = 0; z < N; z++) {
+      const zo = z * NN, zp = xp[z] * NN, zm = xm[z] * NN;
+      for (let y = 0; y < N; y++) {
+        const yo = y * N, yp = xp[y] * N, ym = xm[y] * N;
+        for (let x = 0; x < N; x++) {
+          const i = x + yo + zo, x0 = re[i], y0 = im[i];
+          const lr = re[xp[x] + yo + zo] + re[xm[x] + yo + zo] + re[x + yp + zo] + re[x + ym + zo] + re[x + yo + zp] + re[x + yo + zm] - 6 * x0;
+          const li = im[xp[x] + yo + zo] + im[xm[x] + yo + zo] + im[x + yp + zo] + im[x + ym + zo] + im[x + yo + zp] + im[x + yo + zm] - 6 * y0;
+          const a2 = x0 * x0 + y0 * y0, q = 1 / (1 + dt * a2 * a2);
+          R[i] = (x0 + dt * (mu * x0 - w * y0 + (x0 - b * y0) * a2 + D * (lr - al * li))) * q;
+          I[i] = (y0 + dt * (mu * y0 + w * x0 + (y0 + b * x0) * a2 + D * (li + al * lr))) * q;
+        }
+      }
+    }
+    this.re = R; this.im = I; this.re2 = re; this.im2 = im; this.t += dt;
+  }
+  // zero-lines: plaquettes the phase winds around; joined cube by cube into oriented segments
+  filaments(rel = 0.12) {
+    const minAmp = rel * rAttach(Math.max(this.p.mu, -0.25));
+    const N = this.N, n = this.n, re = this.re, im = this.im, ph = this.ph, xp = this.xp, NN = N * N, TAU = 2 * Math.PI;
+    const sg = this.sg || (this.sg = new Uint8Array(n)); // quadrant bits: a plaquette whose corners share a half-plane cannot wind
+    for (let i = 0; i < n; i++) { sg[i] = (re[i] > 0 ? 1 : 0) | (im[i] > 0 ? 2 : 0); }
+    const Wx = this.Wx, Wy = this.Wy, Wz = this.Wz; const m2 = minAmp * minAmp * 4;
+    const A2 = i => re[i] * re[i] + im[i] * im[i];
+    const wind = (a, b, c, d) => {
+      const o = sg[a] | sg[b] | sg[c] | sg[d], an = sg[a] & sg[b] & sg[c] & sg[d];
+      if ((o & 1) === (an & 1) || (o & 2) === (an & 2)) return 0; // all Re same sign, or all Im same sign
+      if (A2(a) + A2(b) + A2(c) + A2(d) < m2) return 0;
+      const pa = Math.atan2(im[a], re[a]), pb = Math.atan2(im[b], re[b]), pc = Math.atan2(im[c], re[c]), pd = Math.atan2(im[d], re[d]);
+      return Math.round((wrapPi(pb - pa) + wrapPi(pc - pb) + wrapPi(pd - pc) + wrapPi(pa - pd)) / TAU);
+    };
+    for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = x + N * y + NN * z, X = xp[x], Y = xp[y] * N, Z = xp[z] * NN, y0 = N * y, z0 = NN * z;
+      Wz[i] = wind(i, X + y0 + z0, X + Y + z0, x + Y + z0);        // normal +z : x then y
+      Wx[i] = wind(i, x + Y + z0, x + Y + Z, x + y0 + Z);          // normal +x : y then z
+      Wy[i] = wind(i, x + y0 + Z, X + y0 + Z, X + y0 + z0);        // normal +y : z then x
+    }
+    // walk cubes: pair faces where the line enters with faces where it leaves
+    const segs = []; const parent = new Int32Array(3 * n).fill(-1);
+    const find = a => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+    const unite = (a, b) => { a = find(a); b = find(b); if (a !== b) parent[a] = b; };
+    let length = 0;
+    for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = x + N * y + NN * z, X = xp[x], Y = xp[y], Z = xp[z];
+      if (!(Wz[i] | Wx[i] | Wy[i] | Wz[x + N * y + NN * Z] | Wx[X + N * y + NN * z] | Wy[x + N * Y + NN * z])) continue;
+      const faces = [ // [plaquette id, outward flux, center]
+        [3 * i + 2, -Wz[i], x + .5, y + .5, z], [3 * (x + N * y + NN * Z) + 2, Wz[x + N * y + NN * Z], x + .5, y + .5, z + 1],
+        [3 * i + 0, -Wx[i], x, y + .5, z + .5], [3 * (X + N * y + NN * z) + 0, Wx[X + N * y + NN * z], x + 1, y + .5, z + .5],
+        [3 * i + 1, -Wy[i], x + .5, y, z + .5], [3 * (x + N * Y + NN * z) + 1, Wy[x + N * Y + NN * z], x + .5, y + 1, z + .5]];
+      const ins = [], outs = [];
+      for (const f of faces) { if (f[1] < 0) ins.push(f); else if (f[1] > 0) outs.push(f); }
+      if (!ins.length) continue;
+      for (const f of ins.concat(outs)) if (parent[f[0]] < 0) parent[f[0]] = f[0];
+      const interior = x < N - 1 && y < N - 1 && z < N - 1;
+      for (let k = 0; k < Math.min(ins.length, outs.length); k++) {
+        unite(ins[k][0], outs[k][0]);
+        if (interior) { const a = ins[k], b = outs[k]; segs.push(a[2], a[3], a[4], b[2], b[3], b[4], find(a[0])); length += Math.hypot(b[2] - a[2], b[3] - a[3], b[4] - a[4]); }
+      }
+    }
+    // resolve component labels after all unions
+    const roots = new Map(); const comp = [];
+    for (let s = 0; s < segs.length; s += 7) { const r = find(segs[s + 6]); if (!roots.has(r)) roots.set(r, roots.size); comp.push(roots.get(r)); }
+    return { segs, comp, loops: roots.size, length };
+  }
+  stats() { let z = 0; const r = rAttach(Math.max(this.p.mu, -0.25)); for (let i = 0; i < this.n; i++) if (Math.hypot(this.re[i], this.im[i]) < 0.5 * r) z++; return { zeroFrac: z / this.n }; }
+}
+
+// Gauss linking number between two sets of oriented segments (Klenin & Langowski 2000)
+function linking(A, B) {
+  let tot = 0; const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const nrm = a => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }, as = v => Math.asin(Math.max(-1, Math.min(1, v)));
+  for (const [p1, p2] of A) for (const [p3, p4] of B) {
+    const r13 = sub(p3, p1), r14 = sub(p4, p1), r23 = sub(p3, p2), r24 = sub(p4, p2);
+    const n1 = nrm(cr(r13, r14)), n2 = nrm(cr(r14, r24)), n3 = nrm(cr(r24, r23)), n4 = nrm(cr(r23, r13));
+    const om = as(dot(n1, n2)) + as(dot(n2, n3)) + as(dot(n3, n4)) + as(dot(n4, n1));
+    tot += om * Math.sign(dot(cr(sub(p4, p3), sub(p2, p1)), r13));
+  }
+  return tot / (4 * Math.PI);
+}
+
+
+
+// =====================================================================
+// UI + rendering
+// =====================================================================
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const hex2rgb = h => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
+const C = {
+  reach: hex2rgb(cssv('--reach') || '#f2a33a'), rise: hex2rgb(cssv('--rise') || '#e8557f'),
+  resist: hex2rgb(cssv('--resist') || '#5b86ff'), fall: hex2rgb(cssv('--fall') || '#27c2ae'),
+  zero: hex2rgb(cssv('--zero') || '#f6f1e6'), ego: hex2rgb(cssv('--ego') || '#a792ff')
+};
+const WHEEL = [C.reach, C.rise, C.resist, C.fall];
+const TAU = 2 * Math.PI;
+// phase -> colour on the reaching / rising / resisting / falling wheel; amplitude blends from pearl (zero) to full colour
+function phaseRGB(x, y, ref, out, o, gamma = 0.75) {
+  let a = Math.atan2(y, x); if (a < 0) a += TAU;
+  const u = a / (Math.PI / 2), i = Math.floor(u) % 4, f = u - Math.floor(u), A = WHEEL[i], B = WHEEL[(i + 1) % 4];
+  const s = Math.pow(Math.min(1, Math.hypot(x, y) / ref), gamma);
+  for (let c = 0; c < 3; c++) { const col = A[c] + (B[c] - A[c]) * f; out[o + c] = C.zero[c] + (col - C.zero[c]) * s; }
+}
+const rgbCss = (r, g, b, a = 1) => `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})`;
+const fmt = (v, d = 2) => (Math.abs(v) < 0.5 * Math.pow(10, -d) ? 0 : v).toFixed(d).replace('-', '−');
+const pct = v => `${Math.round(v * 100)}%`;
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let toastTimer = 0;
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), ms); }
+
+function regimePill(mu) {
+  if (mu > 0) return '<span class="pill attach">attaching</span>';
+  if (mu > -0.25) return '<span class="pill band">bistable</span>';
+  return '<span class="pill free">releasing</span>';
+}
+
+// ---------- 2D canvas helpers ----------
+function fitCanvas(cv) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!cv.dataset.h) cv.dataset.h = cv.getAttribute('height');
+  const w = Math.max(10, cv.clientWidth), h = +cv.dataset.h;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.height = h + 'px'; }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+const INK = cssv('--ink') || '#ece7dc', INK2 = cssv('--ink-2') || '#aeadbd', INK3 = cssv('--ink-3') || '#74758c', LINE = cssv('--line') || '#262a3d', LINE2 = cssv('--line-2') || '#33384f';
+const CHA = cssv('--chart-a') || '#c47f22', CHB = cssv('--chart-b') || '#5a82f5';
+const MONO = '10.5px "IBM Plex Mono", ui-monospace, monospace';
+
+// Roadmap: bifurcation diagram of the knot law with each knot plotted
+function drawBif(P) {
+  const cv = $('#bifCanvas'); if (!cv.offsetParent) return;
+  const { ctx, w, h } = fitCanvas(cv);
+  const L = 34, Rr = 10, T = 12, B = 24, x0 = -0.45, x1 = 0.35, y1 = 1.32;
+  const X = m => L + (m - x0) / (x1 - x0) * (w - L - Rr), Y = r => T + (1 - r / y1) * (h - T - B);
+  ctx.fillStyle = 'rgba(167,146,255,0.07)'; ctx.fillRect(X(-0.25), T, X(0) - X(-0.25), h - T - B);
+  ctx.font = MONO; ctx.fillStyle = INK3; ctx.textAlign = 'center'; ctx.fillText('bistable band', (X(-0.25) + X(0)) / 2, T + 11);
+  ctx.strokeStyle = LINE; ctx.lineWidth = 1; ctx.beginPath();
+  for (const m of [-0.4, -0.2, 0, 0.2]) { ctx.moveTo(X(m), T); ctx.lineTo(X(m), h - B); }
+  for (const r of [0.5, 1.0]) { ctx.moveTo(L, Y(r)); ctx.lineTo(w - Rr, Y(r)); }
+  ctx.stroke();
+  ctx.fillStyle = INK3; ctx.textAlign = 'center';
+  for (const m of [-0.4, -0.2, 0, 0.2]) ctx.fillText(fmt(m, 1), X(m), h - 8);
+  ctx.textAlign = 'right'; for (const r of [0, 0.5, 1.0]) ctx.fillText(fmt(r, 1), L - 6, Y(r) + 3.5);
+  ctx.textAlign = 'left'; ctx.fillText('|z|', 4, T + 4); ctx.textAlign = 'right'; ctx.fillText('ego gain μ', w - Rr, h - B - 6);
+  const curve = (fn, a, b, dash, col, lw) => { ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); for (let i = 0; i <= 120; i++) { const m = a + (b - a) * i / 120, r = fn(m); i ? ctx.lineTo(X(m), Y(r)) : ctx.moveTo(X(m), Y(r)); } ctx.stroke(); ctx.setLineDash([]); };
+  curve(() => 0, x0, 0, [], INK, 2);
+  curve(() => 0, 0, x1, [4, 4], INK3, 1.5);
+  curve(m => rAttach(m), -0.25, x1, [], INK, 2);
+  curve(m => rThresh(m), -0.25, -0.0001, [4, 4], INK3, 1.5);
+  ctx.fillStyle = INK2; ctx.textAlign = 'left'; ctx.fillText('attachment', X(0.06), Y(rAttach(0.06)) - 8);
+  ctx.fillText('threshold', X(-0.1) + 6, Y(rThresh(-0.1)) + 4);
+  ctx.fillText('zero-state', X(-0.43), Y(0) - 7);
+  const mb = P.muBase();
+  ctx.strokeStyle = 'rgba(167,146,255,0.8)'; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(clamp(mb, x0, x1)), T); ctx.lineTo(X(clamp(mb, x0, x1)), h - B); ctx.stroke(); ctx.setLineDash([]);
+  const tmp = [0, 0, 0];
+  for (let k = 0; k < P.K; k++) {
+    const [zx, zy] = P.z[k], r = Math.hypot(zx, zy), m = clamp(P.muK(k), x0, x1);
+    phaseRGB(zx, zy, 1.04, tmp, 0);
+    ctx.beginPath(); ctx.arc(X(m), Y(Math.min(r, y1)), 4.5, 0, TAU); ctx.fillStyle = rgbCss(...tmp); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#171a28'; ctx.stroke();
+  }
+  $('#bifNote').textContent = `μ̄ = ${fmt(mb)}`;
+}
+
+// generic stacked rows sharing one x axis (small multiples, one y-scale each)
+function drawRows(cv, rows, xmax, marker, hover) {
+  if (!cv.offsetParent) return null;
+  const { ctx, w, h } = fitCanvas(cv);
+  const L = 8, Rr = 8, T = 6, B = 18, gap = 8, LB = 13, rh = (h - T - B - gap * (rows.length - 1)) / rows.length;
+  const X = t => L + t / xmax * (w - L - Rr);
+  rows.forEach((row, ri) => {
+    const top0 = T + ri * (rh + gap), top = top0 + LB, bot = top0 + rh, n = row.n;
+    ctx.strokeStyle = LINE; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L, bot + 0.5); ctx.lineTo(w - Rr, bot + 0.5); ctx.stroke();
+    let ymin = row.min ?? 0, ymax = row.max ?? 0; if (row.auto) for (let i = 0; i < n; i++) { ymax = Math.max(ymax, row.y[i]); ymin = Math.min(ymin, row.y[i]); }
+    if (ymax - ymin < 1e-6) ymax = ymin + 1;
+    const Yv = v => bot - (v - ymin) / (ymax - ymin) * (rh - LB - 3);
+    if (row.zeroLine && ymin < 0) { ctx.strokeStyle = LINE2; ctx.beginPath(); ctx.moveTo(L, Yv(0)); ctx.lineTo(w - Rr, Yv(0)); ctx.stroke(); }
+    if (n > 1) {
+      const cols = Math.max(1, Math.floor(w - L - Rr)), xs = row.x;
+      if (row.envelope) { // min/max per pixel column keeps fast oscillation visible
+        ctx.strokeStyle = row.color; ctx.lineWidth = 1; ctx.beginPath();
+        let j = 0;
+        for (let c = 0; c < cols && j < n; c++) {
+          const tEnd = (c + 1) / cols * xmax; let lo = Infinity, hi = -Infinity;
+          while (j < n && xs[j] <= tEnd) { lo = Math.min(lo, row.y[j]); hi = Math.max(hi, row.y[j]); j++; }
+          if (lo <= hi) { ctx.moveTo(L + c + 0.5, Yv(lo)); ctx.lineTo(L + c + 0.5, Yv(hi) - 0.5); }
+        }
+        ctx.stroke();
+      } else {
+        const step = Math.max(1, Math.floor(n / (cols * 2)));
+        ctx.beginPath(); ctx.moveTo(X(xs[0]), Yv(row.y[0]));
+        for (let i = step; i < n; i += step) ctx.lineTo(X(xs[i]), Yv(row.y[i]));
+        ctx.lineTo(X(xs[n - 1]), Yv(row.y[n - 1]));
+        if (row.fill) { ctx.save(); ctx.lineTo(X(xs[n - 1]), bot); ctx.lineTo(X(xs[0]), bot); ctx.closePath(); ctx.fillStyle = row.fill; ctx.fill(); ctx.restore(); ctx.beginPath(); ctx.moveTo(X(xs[0]), Yv(row.y[0])); for (let i = step; i < n; i += step) ctx.lineTo(X(xs[i]), Yv(row.y[i])); ctx.lineTo(X(xs[n - 1]), Yv(row.y[n - 1])); }
+        ctx.strokeStyle = row.color; ctx.lineWidth = 1.6; ctx.stroke();
+        ctx.beginPath(); ctx.arc(X(xs[n - 1]), Yv(row.y[n - 1]), 2.6, 0, TAU); ctx.fillStyle = row.color; ctx.fill();
+      }
+    }
+    ctx.font = MONO; ctx.fillStyle = INK3; ctx.textAlign = 'left'; ctx.fillText(row.label, L + 2, top0 + 9);
+    ctx.textAlign = 'right'; ctx.fillText(row.fmtMax ? row.fmtMax(ymax) : '', w - Rr - 2, top0 + 9);
+    row._Y = Yv;
+  });
+  ctx.font = MONO; ctx.fillStyle = INK3; ctx.textAlign = 'left'; ctx.fillText(rows.xLabel0 || '', L, h - 5); ctx.textAlign = 'right'; ctx.fillText(rows.xLabel1 || '', w - Rr, h - 5);
+  if (marker != null) { ctx.strokeStyle = 'rgba(246,241,230,0.35)'; ctx.beginPath(); ctx.moveTo(X(marker), T); ctx.lineTo(X(marker), h - B); ctx.stroke(); }
+  if (hover != null) { ctx.strokeStyle = INK2; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(X(hover), T); ctx.lineTo(X(hover), h - B); ctx.stroke(); ctx.setLineDash([]); }
+  return { X, L, Rr, w };
+}
+function attachHover(wrapSel, cvSel, tipSel, getState) {
+  const wrap = $(wrapSel), cv = $(cvSel), tip = $(tipSel);
+  const st = { x: null };
+  cv.addEventListener('pointermove', e => {
+    const s = getState(); if (!s) return; const r = cv.getBoundingClientRect(), px = e.clientX - r.left;
+    const t = clamp((px - 8) / (r.width - 16) * s.xmax, 0, s.xmax); st.x = t;
+    const html = s.tip(t); if (!html) { tip.classList.remove('on'); return; }
+    tip.innerHTML = html; tip.style.left = clamp(px, 60, r.width - 60) + 'px'; tip.style.top = (e.clientY - r.top) + 'px'; tip.classList.add('on');
+  });
+  cv.addEventListener('pointerleave', () => { st.x = null; tip.classList.remove('on'); });
+  return st;
+}
+function nearestIdx(xs, n, t) { let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] < t) lo = m; else hi = m; } return Math.abs(xs[lo] - t) < Math.abs(xs[hi] - t) ? lo : hi; }
+
+// ---------- slider binding ----------
+function bindRange(id, fmtFn, onInput) {
+  const el = $('#' + id), out = $('#' + id + 'Val');
+  const upd = () => { const v = parseFloat(el.value); if (out) out.textContent = fmtFn(v); onInput(v); };
+  el.addEventListener('input', upd); upd(); return el;
+}
+
+// ---------- antidote verdict ----------
+function antidoteVerdict(dose, aimDeg) {
+  const a = aimDeg * Math.PI / 180, re = 1 - dose * Math.cos(a), im = -dose * Math.sin(a), m = Math.hypot(re, im);
+  const el = $('#antiVerdict'); el.className = 'verdict';
+  let msg;
+  if (m > 1.001) { msg = `Knot grows ×${fmt(m)}. The aim is ${aimDeg}° off; this dose only helps within ${Math.round(Math.acos(Math.min(1, dose / 2)) * 180 / Math.PI)}°.`; el.classList.add('bad'); }
+  else if (m < 0.2) { msg = `Knot falls to ×${fmt(m)}: close to zero, so bliss follows if it stays there.`; el.classList.add('good'); }
+  else if (re < 0) msg = `Overshoot: the knot swings to the other side at ×${fmt(m)} of its size.`;
+  else msg = `Knot shrinks to ×${fmt(m)} of its size.`;
+  el.textContent = msg; return { m, re };
+}
+
+// =====================================================================
+// boot three.js
+// =====================================================================
+let THREE = null;
+try { THREE = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js'); } catch (e) { THREE = null; }
+const canvas = $('#gl');
+let renderer = null;
+if (THREE) {
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' }); }
+  catch (e) { renderer = null; }
+}
+if (!renderer) {
+  const fb = $('#fallback'); fb.hidden = false;
+  fb.innerHTML = '<p>The 3D view needs WebGL and the three.js library, and they didn&rsquo;t load here. The <b>What emerged</b> tab and the <b>Run 200 lives</b> experiment still work.</p>';
+  $('#transport').hidden = true;
+} else {
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setClearColor(0x0d0f18, 1);
+}
+
+// ---------- shader materials (sRGB colours written straight through) ----------
+function glowMat({ size = 0.08, opacity = 1, perSize = false, color = null } = {}) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uSize: { value: size }, uOpacity: { value: opacity }, uViewH: { value: 800 }, uColor: { value: new THREE.Vector3(...(color || [1, 1, 1])) } },
+    defines: { PER_SIZE: perSize ? 1 : 0, USE_UCOLOR: color ? 1 : 0 },
+    vertexShader: `
+      attribute vec3 aCol; attribute float aSize; uniform float uSize; uniform float uViewH; uniform vec3 uColor; varying vec3 vCol; varying float vA;
+      void main(){
+        #if USE_UCOLOR
+          vCol = uColor;
+        #else
+          vCol = aCol;
+        #endif
+        float s = uSize; vA = 1.0;
+        #if PER_SIZE
+          s = uSize * aSize; vA = clamp(aSize, 0.0, 1.0);
+        #endif
+        vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+        gl_PointSize = clamp(s * uViewH * 0.5 * projectionMatrix[1][1] / -mv.z, 0.0, 90.0);
+      }`,
+    fragmentShader: `
+      uniform float uOpacity; varying vec3 vCol; varying float vA;
+      void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(c) * 2.0; if (d > 1.0) discard; float a = exp(-d * d * 3.2) * (1.0 - smoothstep(0.7, 1.0, d)); gl_FragColor = vec4(vCol, a * uOpacity * vA); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+}
+function lineMat({ opacity = 1, color = null, additive = false } = {}) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uOpacity: { value: opacity }, uColor: { value: new THREE.Vector3(...(color || [1, 1, 1])) } },
+    defines: { USE_UCOLOR: color ? 1 : 0 },
+    vertexShader: `attribute vec3 aCol; uniform vec3 uColor; varying vec3 vCol; void main(){
+        #if USE_UCOLOR
+          vCol = uColor;
+        #else
+          vCol = aCol;
+        #endif
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uOpacity; varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol, uOpacity); }`,
+    transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending
+  });
+}
+function dynAttr(arr, n) { const a = new THREE.BufferAttribute(arr, n); a.setUsage(THREE.DynamicDrawUsage); return a; }
+function unitCircle(nPts) { const a = new Float32Array((nPts + 1) * 3); for (let i = 0; i <= nPts; i++) { const t = i / nPts * TAU; a[i * 3] = Math.cos(t); a[i * 3 + 2] = Math.sin(t); } return a; }
+function stars(count, radius) {
+  const pos = new Float32Array(count * 3), col = new Float32Array(count * 3), rng = mulberry32(99);
+  for (let i = 0; i < count; i++) { const u = rng() * 2 - 1, t = rng() * TAU, s = Math.sqrt(1 - u * u), r = radius * (0.8 + 0.4 * rng()); pos[i * 3] = r * s * Math.cos(t); pos[i * 3 + 1] = r * u; pos[i * 3 + 2] = r * s * Math.sin(t); const b = 0.25 + 0.45 * rng(); col[i * 3] = b; col[i * 3 + 1] = b; col[i * 3 + 2] = b * 1.1; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 3));
+  const p = new THREE.Points(g, glowMat({ size: radius * 0.012, opacity: 0.7 })); p.frustumCulled = false; return p;
+}
+
+// ---------- orbit camera ----------
+class Orbit {
+  constructor(o) { Object.assign(this, { theta: 0.5, phi: 1.1, dist: 10, minD: 2, maxD: 60, tx: 0, ty: 0, tz: 0, goal: null, lastTouch: -1e9 }, o); }
+  rotate(dx, dy) { this.theta -= dx * 0.006; this.phi = clamp(this.phi - dy * 0.006, 0.02, Math.PI - 0.02); this.lastTouch = performance.now(); if (this.goal) { delete this.goal.theta; delete this.goal.phi; } }
+  zoom(f) { this.dist = clamp(this.dist * f, this.minD, this.maxD); if (this.goal) delete this.goal.dist; }
+  ease(dt) { if (!this.goal) return; const k = 1 - Math.exp(-dt * 4); let done = true; for (const key in this.goal) { const d = this.goal[key] - this[key]; this[key] += d * k; if (Math.abs(d) > 1e-3) done = false; } if (done) this.goal = null; }
+  apply(cam) { const s = Math.sin(this.phi); cam.position.set(this.tx + this.dist * s * Math.sin(this.theta), this.ty + this.dist * Math.cos(this.phi), this.tz + this.dist * s * Math.cos(this.theta)); cam.lookAt(this.tx, this.ty, this.tz); }
+}
+
+// =====================================================================
+// Scene I: one psyche
+// =====================================================================
+function makePsycheScene() {
+  const P = new Psyche(7), K = P.K, H = 14, R = 1.45, SUB = 0.05, SDT = 0.1, NS = Math.round(P.T / SDT) + 4;
+  const yOf = t => t / P.T * H;
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(38, 1, 0.05, 400);
+  const orbit = new Orbit({ theta: 0.55, phi: 1.2, dist: 8.5, minD: 2.5, maxD: 45 });
+  scene.add(stars(700, 60));
+  // the zero-line: the axis of the column
+  const axG = new THREE.BufferGeometry(); axG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, H, 0], 3));
+  scene.add(new THREE.Line(axG, lineMat({ color: C.zero, opacity: 0.28 })));
+  // decade ticks along the axis
+  const tk = []; for (let i = 0; i <= 10; i++) { const y = H * i / 10; tk.push(-0.12, y, 0, 0.12, y, 0); }
+  const tkG = new THREE.BufferGeometry(); tkG.setAttribute('position', new THREE.Float32BufferAttribute(tk, 3));
+  scene.add(new THREE.LineSegments(tkG, lineMat({ color: C.zero, opacity: 0.22 })));
+  // knot threads
+  const threads = [];
+  const tLine = lineMat({ opacity: 0.85 }), tGlow = glowMat({ size: 0.055, opacity: 0.55 });
+  for (let k = 0; k < K; k++) {
+    const pos = new Float32Array(NS * 3), col = new Float32Array(NS * 3), g = new THREE.BufferGeometry();
+    g.setAttribute('position', dynAttr(pos, 3)); g.setAttribute('aCol', dynAttr(col, 3)); g.setDrawRange(0, 0);
+    const line = new THREE.Line(g, tLine), pts = new THREE.Points(g, tGlow); line.frustumCulled = pts.frustumCulled = false;
+    scene.add(line, pts); threads.push({ pos, col, g });
+  }
+  // bliss: light along the zero-line
+  const bPos = new Float32Array(NS * 3), bSize = new Float32Array(NS), bG = new THREE.BufferGeometry();
+  bG.setAttribute('position', new THREE.BufferAttribute(bPos, 3)); bG.setAttribute('aSize', dynAttr(bSize, 1)); bG.setDrawRange(0, 0);
+  const blissPts = new THREE.Points(bG, glowMat({ size: 0.45, perSize: true, opacity: 0.22, color: [1.0, 0.93, 0.78] })); blissPts.frustumCulled = false; scene.add(blissPts);
+  for (let i = 0; i < NS; i++) bPos[i * 3 + 1] = yOf(i * SDT);
+  bG.attributes.position.needsUpdate = true;
+  // the present: heads, spokes to the ego, attachment and threshold rings
+  const now = new THREE.Group(); scene.add(now);
+  const hPos = new Float32Array(K * 3), hCol = new Float32Array(K * 3), hG = new THREE.BufferGeometry();
+  hG.setAttribute('position', dynAttr(hPos, 3)); hG.setAttribute('aCol', dynAttr(hCol, 3));
+  const heads = new THREE.Points(hG, glowMat({ size: 0.22, opacity: 1 })); heads.frustumCulled = false; now.add(heads);
+  const spPos = new Float32Array(K * 6), spG = new THREE.BufferGeometry(); spG.setAttribute('position', dynAttr(spPos, 3));
+  const spokes = new THREE.LineSegments(spG, lineMat({ color: C.ego, opacity: 0.22 })); spokes.frustumCulled = false; now.add(spokes);
+  const circ = unitCircle(160), rsG = new THREE.BufferGeometry(); rsG.setAttribute('position', new THREE.BufferAttribute(circ, 3));
+  const attachRing = new THREE.Line(rsG, lineMat({ color: C.reach, opacity: 0.45 })); now.add(attachRing);
+  const dots = unitCircle(72), ruG = new THREE.BufferGeometry(); ruG.setAttribute('position', new THREE.BufferAttribute(dots, 3));
+  const threshRing = new THREE.Points(ruG, glowMat({ size: 0.05, opacity: 0.9, color: C.ego })); now.add(threshRing);
+  const egoMat = new THREE.ShaderMaterial({
+    uniforms: { uCol: { value: new THREE.Vector3(...C.ego) } },
+    vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform vec3 uCol; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.2); gl_FragColor = vec4(uCol, 0.10 + 0.75 * f); }`,
+    transparent: true, depthWrite: false
+  });
+  const egoSphere = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20), egoMat); now.add(egoSphere);
+
+  let n = 0, nextSample = 0, done = false, awakeAt = null;
+  const rec = { x: new Float32Array(NS), wave: new Float32Array(NS), ego: new Float32Array(NS), bliss: new Float32Array(NS) };
+  const tmp = [0, 0, 0];
+  function record() {
+    if (n >= NS) return;
+    const y = yOf(P.t); let wave = 0;
+    for (let k = 0; k < K; k++) {
+      const [zx, zy] = P.z[k], th = threads[k];
+      th.pos[n * 3] = zx * R; th.pos[n * 3 + 1] = y; th.pos[n * 3 + 2] = -zy * R;
+      phaseRGB(zx, zy, 1.04, th.col, n * 3); wave += zx;
+    }
+    const I = P.ego();
+    rec.x[n] = P.t; rec.wave[n] = wave; rec.ego[n] = I; rec.bliss[n] = P.bliss;
+    bSize[n] = n % 6 === 0 ? Math.min(1, P.bliss / 1.2) : 0;
+    n++;
+    for (const th of threads) { th.g.setDrawRange(0, n); th.g.attributes.position.needsUpdate = true; th.g.attributes.aCol.needsUpdate = true; }
+    bG.setDrawRange(0, n); bG.attributes.aSize.needsUpdate = true;
+    if (awakeAt === null && P.t > 50 && I < 0.05) { awakeAt = P.t; toast(`Zero-state reached at ${pct(P.t / P.T)} of life. The ego has dissolved.`, 4200); }
+  }
+  function reset(seed) {
+    P.reset(seed); n = 0; nextSample = 0; done = false; awakeAt = null; bSize.fill(0);
+    record(); nextSample = SDT;
+  }
+  reset(11);
+
+  function simulate(dtReal, speed) {
+    if (done) return;
+    const tu = dtReal * 8 * speed; let steps = Math.min(400, Math.round(tu / SUB));
+    while (steps-- > 0) {
+      P.step(SUB);
+      if (P.t >= nextSample - 1e-9) { record(); nextSample += SDT; }
+      if (P.t >= P.T) {
+        done = true;
+        if (awakeAt === null) { const att = P.z.filter(([x, y]) => Math.hypot(x, y) > 0.3).length; toast(`End of life. ${att} of 7 knots were still attached at death. Replay it, or try a different life.`, 5200); }
+        break;
+      }
+    }
+  }
+  const labels = [['conception', 0, -0.45, 0, 'lbl'], ['death', 0, H + 0.45, 0, 'lbl'], ['ego  I', 0, 0, 0, 'lbl ego']].map(([text, x, y, z, cls]) => { const el = document.createElement('span'); el.className = cls; el.textContent = text; el.hidden = true; $('#labels').appendChild(el); return { el, v: new THREE.Vector3(x, y, z) }; });
+  let view = 'follow';
+  const views = {
+    follow: () => ({ phi: 1.2, dist: 8.5 }),
+    life: () => ({ phi: Math.PI / 2 - 0.02, dist: 26 }),
+    top: () => ({ phi: 0.04, dist: 8 })
+  };
+  function setView(v) { view = v; orbit.goal = views[v](); if (v === 'life') orbit.goal.theta = Math.round(orbit.theta / TAU) * TAU; }
+
+  function update(dt) {
+    const y = yOf(P.t), mb = P.muBase();
+    now.position.y = y;
+    for (let k = 0; k < K; k++) {
+      const [zx, zy] = P.z[k];
+      hPos[k * 3] = zx * R; hPos[k * 3 + 1] = 0; hPos[k * 3 + 2] = -zy * R; phaseRGB(zx, zy, 1.04, hCol, k * 3, 0.5);
+      spPos[k * 6 + 3] = zx * R; spPos[k * 6 + 5] = -zy * R;
+    }
+    hG.attributes.position.needsUpdate = true; hG.attributes.aCol.needsUpdate = true; spG.attributes.position.needsUpdate = true;
+    const rs = mb >= -0.25 ? rAttach(mb) : 0, ru = rThresh(mb);
+    attachRing.visible = rs > 0; attachRing.scale.set(rs * R, 1, rs * R);
+    threshRing.visible = ru > 0 && isFinite(ru); if (threshRing.visible) threshRing.scale.set(ru * R, 1, ru * R);
+    const I = P.ego(), er = 0.08 + 0.2 * Math.sqrt(I); egoSphere.scale.setScalar(er);
+    labels[2].v.set(0, y + er + 0.28, 0);
+    const ty = view === 'life' ? H / 2 : y - (view === 'top' ? 0 : 0.6);
+    orbit.ty += (ty - orbit.ty) * (1 - Math.exp(-dt * 3));
+    orbit.ease(dt); orbit.apply(camera);
+    // readouts
+    $('#pAge').textContent = pct(P.t / P.T); $('#pMu').textContent = fmt(mb); $('#pEgo').textContent = fmt(I);
+    $('#pBliss').textContent = fmt(P.bliss); $('#pW').textContent = Math.round(P.W); $('#pRegime').innerHTML = regimePill(mb);
+  }
+  const viewButtons = [['follow', 'Follow now'], ['life', 'Whole life'], ['top', 'From above']];
+  return {
+    scene, camera, orbit, P, labels, rec, get n() { return n; }, reset, simulate, update, setView, viewButtons, get view() { return view; },
+    title: ['One psyche, from conception to death', 'time runs upward · each thread is one knot · the axis is the zero-state'],
+    get done() { return done; }, restartIfDone() { if (done) reset(P.seed); }
+  };
+}
+
+// =====================================================================
+// Scene II: population on a sphere
+// =====================================================================
+function makePopulationScene() {
+  const Pop = new Population(6), n = Pop.n, PR = 3.2;
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(38, 1, 0.05, 400);
+  const orbit = new Orbit({ theta: 0.4, phi: 1.2, dist: 11, minD: 5, maxD: 40 });
+  scene.add(stars(1200, 70));
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), V = Pop.g.V;
+  for (let i = 0; i < n; i++) { pos[i * 3] = V[i][0] * PR; pos[i * 3 + 1] = V[i][1] * PR; pos[i * 3 + 2] = V[i][2] * PR; }
+  const idx = new Uint32Array(Pop.g.F.length * 3); Pop.g.F.forEach((f, j) => { idx[j * 3] = f[0]; idx[j * 3 + 1] = f[1]; idx[j * 3 + 2] = f[2]; });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aCol', dynAttr(col, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+  const sphereMat = new THREE.ShaderMaterial({
+    vertexShader: `attribute vec3 aCol; varying vec3 vCol; varying vec3 vN; varying vec3 vV; void main(){ vCol = aCol; vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normalize(position)); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying vec3 vCol; varying vec3 vN; varying vec3 vV; void main(){ vec3 n = normalize(vN); float lam = max(dot(n, normalize(vec3(-0.35, 0.55, 0.75))), 0.0); vec3 c = vCol * (0.42 + 0.68 * lam); float rim = pow(1.0 - max(dot(n, normalize(vV)), 0.0), 3.0); c += rim * vec3(0.22, 0.26, 0.42); gl_FragColor = vec4(c, 1.0); }`
+  });
+  const globe = new THREE.Mesh(g, sphereMat); scene.add(globe);
+  const atm = new THREE.Mesh(new THREE.SphereGeometry(PR * 1.07, 64, 32), new THREE.ShaderMaterial({
+    vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 4.0); gl_FragColor = vec4(vec3(0.45, 0.5, 0.85), f * 0.55); }`,
+    side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  })); scene.add(atm);
+  const QMAX = 6000, qPos = new Float32Array(QMAX * 3), qCol = new Float32Array(QMAX * 3), qG = new THREE.BufferGeometry();
+  qG.setAttribute('position', dynAttr(qPos, 3)); qG.setAttribute('aCol', dynAttr(qCol, 3)); qG.setDrawRange(0, 0);
+  const qPts = new THREE.Points(qG, glowMat({ size: 0.16, opacity: 1 })); qPts.frustumCulled = false; scene.add(qPts);
+  const GMAX = 64, gPos = new Float32Array(GMAX * 3), gG = new THREE.BufferGeometry(); gG.setAttribute('position', dynAttr(gPos, 3)); gG.setDrawRange(0, 0);
+  const guruPts = new THREE.Points(gG, glowMat({ size: 0.42, opacity: 1, color: [1, 0.97, 0.9] })); guruPts.frustumCulled = false; scene.add(guruPts);
+  const hist = { x: [], q: [], z: [] };
+  let lastQ = { pos: [], neg: [], net: 0 }, frameCount = 0, warm = 0, spin = !reduceMotion, placeTeacher = true;
+  const raycaster = new THREE.Raycaster();
+
+  function colourise() { for (let i = 0; i < n; i++) phaseRGB(Pop.re[i], Pop.im[i], 1.05, col, i * 3); g.attributes.aCol.needsUpdate = true; }
+  function updateCharges() {
+    lastQ = Pop.charges(0.08); let m = 0; const F = Pop.g.F;
+    const put = (f, c) => { if (m >= QMAX) return; const [a, b, d] = F[f]; for (let k = 0; k < 3; k++) qPos[m * 3 + k] = (V[a][k] + V[b][k] + V[d][k]) / 3 * PR * 1.012; qCol[m * 3] = c[0]; qCol[m * 3 + 1] = c[1]; qCol[m * 3 + 2] = c[2]; m++; };
+    for (const f of lastQ.pos) put(f, [1, 0.95, 0.82]); for (const f of lastQ.neg) put(f, [0.82, 0.9, 1]);
+    qG.setDrawRange(0, m); qG.attributes.position.needsUpdate = true; qG.attributes.aCol.needsUpdate = true;
+  }
+  function pushHist() {
+    const s = Pop.stats(); hist.x.push(Pop.t); hist.q.push(lastQ.pos.length + lastQ.neg.length); hist.z.push(s.zeroFrac);
+    if (hist.x.length > 1600) for (const k in hist) hist[k] = hist[k].filter((_, i) => i % 2 === 0);
+    return s;
+  }
+  function resetHist() { hist.x = []; hist.q = []; hist.z = []; }
+  function dtFor() { return Math.min(0.1, 0.45 / (Pop.p.K * (1 + Pop.p.alpha ** 2))); }
+  function quench(tq) { Pop.quench(tq, 0.2); resetHist(); warm = 0; syncSlider(); }
+  function synchronize() { Pop.ramp = null; Pop.synchronize(); resetHist(); syncSlider(); }
+  function syncSlider() { const el = $('#pmu'); el.value = Pop.p.mu; $('#pmuVal').textContent = fmt(Pop.p.mu, 3); }
+  // the world opens already formed: fast-forward through the birth of the ego
+  Pop.quench(10, 0.2);
+  let preroll = 110;
+
+  function simulate(dtReal, speed) {
+    const dt = dtFor();
+    let tu = preroll > 0 ? 9 : dtReal * 6 * speed;
+    let steps = Math.min(preroll > 0 ? 90 : 60, Math.max(1, Math.round(tu / dt)));
+    if (preroll > 0) preroll -= steps * dt;
+    const hadRamp = !!Pop.ramp;
+    while (steps-- > 0) Pop.step(dt);
+    if (hadRamp) syncSlider();
+  }
+  function update(dt) {
+    frameCount++;
+    colourise();
+    if (frameCount % 6 === 0 || preroll > 0) { updateCharges(); const s = pushHist(); refreshReadouts(s); }
+    if (spin && performance.now() - orbit.lastTouch > 2500) orbit.theta += dt * 0.05;
+    orbit.ease(dt); orbit.apply(camera);
+  }
+  function refreshReadouts(s) {
+    $('#qCount').innerHTML = `${lastQ.pos.length + lastQ.neg.length}<span class="u"> (${lastQ.pos.length}+ ${lastQ.neg.length}−)</span>`;
+    $('#qNet').textContent = String(lastQ.net).replace('-', '−'); $('#qMu').textContent = fmt(Pop.p.mu, 3);
+    $('#qAmp').textContent = fmt(s.mean); $('#qZero').textContent = pct(s.zeroFrac); $('#qRegime').innerHTML = regimePill(Pop.p.mu);
+  }
+  function tap(ndc) {
+    if (!placeTeacher) return;
+    raycaster.setFromCamera(ndc, camera); const hit = raycaster.intersectObject(globe)[0]; if (!hit) return;
+    if (Pop.gurus.length >= GMAX) { toast('That is the most teachers this world can hold.'); return; }
+    const i = hit.face.a; Pop.addGuru(i); const m = Pop.gurus.length - 1;
+    gPos[m * 3] = V[i][0] * PR * 1.03; gPos[m * 3 + 1] = V[i][1] * PR * 1.03; gPos[m * 3 + 2] = V[i][2] * PR * 1.03;
+    gG.setDrawRange(0, Pop.gurus.length); gG.attributes.position.needsUpdate = true;
+    toast(`Teacher placed. ${Pop.gurus.length} on this world.`);
+  }
+  function clearTeachers() { Pop.clearGurus(); gG.setDrawRange(0, 0); }
+  const viewButtons = [['spin', 'Spin']];
+  return {
+    scene, camera, orbit, Pop, hist, simulate, update, tap, quench, synchronize, clearTeachers, viewButtons,
+    setView(v) { if (v === 'spin') spin = !spin; }, get view() { return spin ? 'spin' : ''; },
+    set placeTeacher(v) { placeTeacher = v; }, get placeTeacher() { return placeTeacher; }, syncSlider,
+    title: ['A world of coupled psyches', 'colour is each person’s phase · pearl sparks are zero-points · tap to place a teacher']
+  };
+}
+
+// =====================================================================
+// Scene III: the universe as one field
+// =====================================================================
+function makeUniverseScene() {
+  const N = window.innerWidth < 700 ? 40 : 48, U = new Universe(N), S = 6.4, c0 = (N - 1) / 2, sc = S / (N - 1);
+  const W = v => (v - c0) * sc;
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(38, 1, 0.05, 400);
+  const orbit = new Orbit({ theta: 0.7, phi: 1.15, dist: 14.5, minD: 4, maxD: 50 });
+  scene.add(stars(1500, 80));
+  const world = new THREE.Group(); scene.add(world);
+  const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(S, S, S)), lineMat({ color: [0.45, 0.47, 0.6], opacity: 0.35 })); world.add(box);
+  const SMAX = 60000, lPos = new Float32Array(SMAX * 6), lG = new THREE.BufferGeometry(); lG.setAttribute('position', dynAttr(lPos, 3)); lG.setDrawRange(0, 0);
+  const lines = new THREE.LineSegments(lG, lineMat({ color: [1, 0.96, 0.88], opacity: 0.95 })); lines.frustumCulled = false; world.add(lines);
+  const mPos = new Float32Array(SMAX * 3), mG = new THREE.BufferGeometry(); mG.setAttribute('position', dynAttr(mPos, 3)); mG.setDrawRange(0, 0);
+  const lineGlow = new THREE.Points(mG, glowMat({ size: 0.2, opacity: 0.55, color: [1, 0.9, 0.72] })); lineGlow.frustumCulled = false; world.add(lineGlow);
+  const CMAX = 50000, cPos = new Float32Array(CMAX * 3), cA = new Float32Array(CMAX), cG = new THREE.BufferGeometry();
+  cG.setAttribute('position', dynAttr(cPos, 3)); cG.setAttribute('aSize', dynAttr(cA, 1)); cG.setDrawRange(0, 0);
+  const cloud = new THREE.Points(cG, glowMat({ size: sc * 2.4, perSize: true, opacity: 0.5, color: [0.98, 0.95, 0.9] })); cloud.frustumCulled = false; world.add(cloud);
+  const tex = new THREE.DataTexture(new Uint8Array(N * N * 4), N, N, THREE.RGBAFormat); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
+  const sliceMat = new THREE.ShaderMaterial({
+    uniforms: { map: { value: tex } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform sampler2D map; varying vec2 vUv; void main(){ vec4 c = texture2D(map, vUv); gl_FragColor = vec4(c.rgb, c.a * 0.62); }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide
+  });
+  const slice = new THREE.Mesh(new THREE.PlaneGeometry(S, S), sliceMat); slice.renderOrder = -1; world.add(slice);
+  lines.renderOrder = lineGlow.renderOrder = cloud.renderOrder = 1;
+  const hist = { x: [], len: [], z: [] };
+  let frameCount = 0, spin = !reduceMotion, lastF = { loops: 0, length: 0 }, sliceK = Math.round(c0), lastLk = null, lkSeq = [], zeroFrac = 0;
+  const show = { lines: true, cloud: true, slice: true };
+
+  function extract() {
+    const f = U.filaments(); lastF = f; const segs = f.segs, ns = Math.min(SMAX, segs.length / 7);
+    for (let s = 0; s < ns; s++) {
+      const o = s * 7, a = [W(segs[o]), W(segs[o + 1]), W(segs[o + 2])], b = [W(segs[o + 3]), W(segs[o + 4]), W(segs[o + 5])];
+      lPos.set(a, s * 6); lPos.set(b, s * 6 + 3); mPos[s * 3] = (a[0] + b[0]) / 2; mPos[s * 3 + 1] = (a[1] + b[1]) / 2; mPos[s * 3 + 2] = (a[2] + b[2]) / 2;
+    }
+    lG.setDrawRange(0, ns * 2); lG.attributes.position.needsUpdate = true; mG.setDrawRange(0, ns); mG.attributes.position.needsUpdate = true;
+    lastLk = null;
+    if (f.loops === 2 && ns < 4000) {
+      const grp = [[], []];
+      for (let s = 0, k = 0; s < segs.length; s += 7, k++) { const c = f.comp[k]; if (c < 2) grp[c].push([[segs[s], segs[s + 1], segs[s + 2]], [segs[s + 3], segs[s + 4], segs[s + 5]]]); }
+      if (grp[0].length > 8 && grp[1].length > 8) { const lk = linking(grp[0], grp[1]); if (Math.abs(lk - Math.round(lk)) < 0.2) lastLk = Math.round(lk); }
+    }
+    if (lastLk !== null && lkSeq[lkSeq.length - 1] !== lastLk) lkSeq.push(lastLk);
+  }
+  function updateCloud() {
+    const re = U.re, im = U.im, n = U.n, rr = rAttach(Math.max(U.p.mu, -0.25)), thr = 0.45 * rr;
+    let cand = 0, zc = 0;
+    for (let i = 0; i < n; i++) { const a = Math.abs(re[i]) + Math.abs(im[i]); if (a < thr * 1.42) { if (Math.hypot(re[i], im[i]) < thr) cand++; } }
+    for (let i = 0; i < n; i++) if (Math.hypot(re[i], im[i]) < 0.5 * rr) zc++;
+    zeroFrac = zc / n;
+    const stride = Math.max(1, Math.ceil(cand / CMAX)); let m = 0, seen = 0; const NN = N * N;
+    for (let i = 0; i < n && m < CMAX; i++) {
+      const a = Math.hypot(re[i], im[i]); if (a >= thr) continue; if ((seen++ % stride) !== 0) continue;
+      const x = i % N, y = ((i / N) | 0) % N, z = (i / NN) | 0;
+      cPos[m * 3] = W(x); cPos[m * 3 + 1] = W(y); cPos[m * 3 + 2] = W(z); const u = 1 - a / thr; cA[m] = u * u * Math.min(1, 1.2 * stride / (1 + 10 * zeroFrac)); m++;
+    }
+    cG.setDrawRange(0, m); cG.attributes.position.needsUpdate = true; cG.attributes.aSize.needsUpdate = true;
+  }
+  function updateSlice() {
+    const d = tex.image.data, NN = N * N, z = sliceK, rr = rAttach(Math.max(U.p.mu, 0)), tmp = [0, 0, 0];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const i = x + N * y + NN * z; phaseRGB(U.re[i], U.im[i], rr, tmp, 0);
+      const o = (x + N * y) * 4; d[o] = tmp[0] * 255; d[o + 1] = tmp[1] * 255; d[o + 2] = tmp[2] * 255; d[o + 3] = 200;
+    }
+    tex.needsUpdate = true; slice.position.z = W(z);
+  }
+  function resetHist() { hist.x = []; hist.len = []; hist.z = []; }
+  function seed(kind) {
+    U.t = 0; U.p.mu = 0.2; U.ramp = null;
+    if (kind === 'bang') U.bigBang(3); else U.seedKnot(kind);
+    resetHist(); lkSeq = []; extract(); syncSlider();
+  }
+  function syncSlider() { $('#umu').value = U.p.mu; $('#umuVal').textContent = fmt(U.p.mu, 3); }
+  function dtFor() { return Math.min(0.1, 0.8 / (6 * (1 + U.p.alpha ** 2))); }
+  U.p.mu = 0.2; U.bigBang(3); for (let i = 0; i < 30; i++) U.step(0.1); extract();
+
+  function simulate(dtReal, speed) { const dt = dtFor(); let steps = clamp(Math.round(dtReal * 5 * speed / dt), 1, 6); while (steps-- > 0) U.step(dt); }
+  function update(dt) {
+    frameCount++;
+    if (frameCount % 10 === 0) extract();
+    if (show.cloud && frameCount % 2 === 0) updateCloud();
+    if (show.slice) updateSlice();
+    if (frameCount % 6 === 0) {
+      hist.x.push(U.t); hist.len.push(lastF.length); hist.z.push(zeroFrac);
+      if (hist.x.length > 1600) for (const k in hist) hist[k] = hist[k].filter((_, i) => i % 2 === 0);
+      $('#uLoops').textContent = lastF.loops; $('#uLen').textContent = Math.round(lastF.length);
+      $('#uLk').textContent = lkSeq.length ? lkSeq.slice(-3).map(v => String(v).replace('-', '−')).join(' → ') : '–';
+      $('#uMu').textContent = fmt(U.p.mu, 3); $('#uZero').textContent = pct(zeroFrac); $('#uRegime').innerHTML = regimePill(U.p.mu);
+    }
+    lines.visible = lineGlow.visible = show.lines; cloud.visible = show.cloud; slice.visible = show.slice;
+    if (spin && performance.now() - orbit.lastTouch > 2500) world.rotation.y += dt * 0.06;
+    orbit.ease(dt); orbit.apply(camera);
+  }
+  return {
+    scene, camera, orbit, U, hist, simulate, update, seed, show, viewButtons: [['spin', 'Spin']],
+    setView(v) { if (v === 'spin') spin = !spin; }, get view() { return spin ? 'spin' : ''; },
+    setSlice(f) { sliceK = Math.round(f * (N - 1)); }, syncSlider, N,
+    title: ['The field as a universe', 'pearl lines are zero-lines · the glow is zero-state · the slice shows phase']
+  };
+}
+
+// =====================================================================
+// wiring
+// =====================================================================
+const scenes = {};
+let active = 'psyche', paused = false, speed = 1;
+const SPEEDS = [0.5, 1, 2, 4];
+// psyche logic always exists (charts and batch work even without WebGL)
+if (renderer) {
+  scenes.psyche = makePsycheScene();
+} else {
+  const P = new Psyche(7);
+  scenes.psyche = { P, rec: { x: [], wave: [], ego: [], bliss: [] }, n: 0, simulate() {}, update() {}, reset(s) { P.reset(s); }, setView() {}, viewButtons: [], labels: [], title: ['', ''] };
+}
+function ensureScene(name) {
+  if (!renderer || scenes[name]) return scenes[name];
+  if (name === 'population') scenes.population = makePopulationScene();
+  if (name === 'universe') scenes.universe = makeUniverseScene();
+  return scenes[name];
+}
+
+function renderViewButtons() {
+  const box = $('#viewBtns'); box.innerHTML = ''; const sc = scenes[active]; if (!sc) return;
+  for (const [key, label] of sc.viewButtons) {
+    const b = document.createElement('button'); b.className = 'btn sm'; b.textContent = label; b.setAttribute('aria-pressed', String(sc.view === key));
+    b.addEventListener('click', () => { sc.setView(key); renderViewButtons(); }); box.appendChild(b);
+  }
+}
+function selectTab(name) {
+  if (!['psyche', 'population', 'universe', 'notes'].includes(name)) name = 'psyche';
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+  const notes = name === 'notes';
+  $('#bench').hidden = notes; $('#notes').hidden = !notes;
+  if (notes) { drawNotesFigures(); try { history.replaceState(null, '', '#notes'); } catch (e) {} return; }
+  active = name;
+  document.querySelectorAll('[data-panel]').forEach(p => { p.hidden = p.dataset.panel !== name; });
+  const sc = ensureScene(name);
+  if (sc && sc.title) { $('#stageK').textContent = sc.title[0]; $('#stageS').textContent = sc.title[1]; }
+  document.querySelectorAll('.lbl').forEach(l => { l.hidden = true; });
+  renderViewButtons(); resize();
+  try { history.replaceState(null, '', '#' + name); } catch (e) {}
+  $('#rack').scrollTop = 0;
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+
+$('#playBtn').addEventListener('click', () => { paused = !paused; $('#playBtn').textContent = paused ? 'Play' : 'Pause'; $('#playBtn').setAttribute('aria-pressed', String(paused)); });
+$('#speedBtn').addEventListener('click', () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; $('#speedBtn').textContent = `Speed ${speed}×`; });
+
+// ---------- pointer controls on the canvas ----------
+const pointers = new Map(); let downAt = null, pinch0 = null;
+canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (pointers.size === 1) downAt = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 }; canvas.classList.add('dragging'); });
+canvas.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId); if (!p) return; const sc = scenes[active]; if (!sc || !sc.orbit) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  if (pointers.size === 1) { sc.orbit.rotate(dx, dy); if (downAt) downAt.moved += Math.abs(dx) + Math.abs(dy); }
+  else if (pointers.size === 2) { const [a, b] = [...pointers.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch0) sc.orbit.zoom(pinch0 / d); pinch0 = d; if (downAt) downAt.moved += 99; }
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId); if (pointers.size < 2) pinch0 = null;
+  if (pointers.size === 0) {
+    canvas.classList.remove('dragging');
+    if (downAt && downAt.moved < 6 && performance.now() - downAt.t < 450) { const sc = scenes[active]; if (sc && sc.tap) { const r = canvas.getBoundingClientRect(); sc.tap(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)); } }
+    downAt = null;
+  }
+}
+canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', e => { const sc = scenes[active]; if (!sc || !sc.orbit) return; e.preventDefault(); sc.orbit.zoom(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
+
+// ---------- resize ----------
+function resize() {
+  if (!renderer) return; const st = $('#stage'), w = st.clientWidth, h = st.clientHeight; if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  const aspect = w / h, fov = aspect < 1.25 ? 2 * Math.atan(Math.tan(19 * Math.PI / 180) * 1.25 / aspect) * 180 / Math.PI : 38;
+  for (const k in scenes) { const sc = scenes[k]; if (sc.camera) { sc.camera.aspect = aspect; sc.camera.fov = fov; sc.camera.updateProjectionMatrix(); } }
+}
+new ResizeObserver(() => { resize(); drawCharts(true); }).observe($('#stage'));
+window.addEventListener('resize', () => { resize(); drawCharts(true); });
+
+// ---------- psyche panel ----------
+const PS = scenes.psyche, P = PS.P;
+bindRange('dose', v => fmt(v), v => { P.p.dose = v; antidoteVerdict(v, P.p.aim); });
+bindRange('aim', v => `${v}°`, v => { P.p.aim = v; antidoteVerdict(P.p.dose, v); });
+bindRange('presence', v => fmt(v), v => { P.p.presence = v; });
+bindRange('mu0', v => fmt(v), v => { P.p.mu0 = v; });
+bindRange('learn', v => fmt(v), v => { P.p.learn = v; });
+bindRange('crave', v => fmt(v, 3), v => { P.p.crave = v; });
+bindRange('events', v => fmt(v, 1), v => { P.p.events = v / 100; });
+bindRange('lifeAnti', v => fmt(v, 1), v => { P.p.lifeAnti = v / 100; });
+$('#antiBtn').addEventListener('click', () => {
+  PS.restartIfDone && PS.restartIfDone();
+  const k = P.strongest(), r0 = Math.hypot(...P.z[k]);
+  P.compensate(k, P.p.dose, P.p.aim * Math.PI / 180);
+  const r1 = Math.hypot(...P.z[k]), ru = rThresh(P.muK(k));
+  let tail = '';
+  if (P.muK(k) >= 0) tail = ' The ego gain is still positive, so it will grow back.';
+  else if (isFinite(ru) && r1 < ru) tail = ' It is below the threshold now and will fall to zero.';
+  else if (isFinite(ru)) tail = ' Still above the threshold: it will climb back unless another antidote follows.';
+  toast(`Antidote to the strongest knot: ${fmt(r0)} → ${fmt(r1)}.${tail}`, 4200);
+});
+$('#traumaBtn').addEventListener('click', () => { PS.restartIfDone && PS.restartIfDone(); P.kick('trauma'); toast('Trauma: a large resisting wave lands on one knot.'); });
+$('#desireBtn').addEventListener('click', () => { PS.restartIfDone && PS.restartIfDone(); P.kick('desire'); toast('Desire: a reaching wave lands on one knot.'); });
+$('#replayBtn').addEventListener('click', () => { PS.reset(P.seed); toast('Replaying this life from conception.'); });
+$('#newLifeBtn').addEventListener('click', () => { PS.reset(1 + Math.floor(Math.random() * 1e6)); toast('A different life: new inheritance, new events.'); });
+
+let lifeHover = { x: null };
+lifeHover = attachHover('#lifeWrap', '#lifeCanvas', '#lifeTip', () => {
+  const n = PS.n; if (!n) return null; const rec = PS.rec;
+  return { xmax: P.T, tip: t => { if (t > rec.x[n - 1]) return null; const i = nearestIdx(rec.x, n, t); return `age ${pct(rec.x[i] / P.T)} · wave ${fmt(rec.wave[i])} · ego ${fmt(rec.ego[i])} · bliss ${fmt(rec.bliss[i])}`; } };
+});
+function drawLife() {
+  const n = PS.n, rec = PS.rec; const rows = [
+    { label: 'psyche wave  Σ Re z', x: rec.x, y: rec.wave, n, color: INK, envelope: true, min: -8, max: 8, zeroLine: true },
+    { label: 'ego  I', x: rec.x, y: rec.ego, n, color: cssv('--ego') || '#a792ff', fill: 'rgba(167,146,255,0.18)', min: 0, max: 8 },
+    { label: 'bliss', x: rec.x, y: rec.bliss, n, color: INK, fill: 'rgba(246,241,230,0.16)', min: 0, auto: true, fmtMax: v => `max ${fmt(v, 1)}` }
+  ];
+  rows.xLabel0 = 'conception'; rows.xLabel1 = 'death';
+  drawRows($('#lifeCanvas'), rows, P.T, n ? rec.x[n - 1] : 0, lifeHover.x);
+}
+
+// many lives
+let batchData = null, batchHover = { x: null };
+$('#batchBtn').addEventListener('click', async () => {
+  const btn = $('#batchBtn'); btn.disabled = true; $('#batchNote').textContent = 'running…';
+  const lives = 200, ages = []; let reached = 0; const Q = new Psyche(7);
+  for (let L = 0; L < lives; L++) {
+    Q.p = { ...P.p }; Q.reset(1000 + L); let awake = null;
+    while (Q.t < Q.T) { Q.step(0.1); if (awake === null && Q.t > 50 && Q.ego() < 0.05) { awake = Q.t; break; } }
+    if (awake !== null) { reached++; ages.push(awake / Q.T); }
+    if (L % 10 === 9) { $('#batchNote').textContent = `running… ${L + 1}/${lives}`; await new Promise(r => setTimeout(r, 0)); }
+  }
+  const bins = new Array(10).fill(0); ages.forEach(a => bins[Math.min(9, Math.floor(a * 10))]++);
+  ages.sort((a, b) => a - b);
+  batchData = { bins, never: lives - reached, lives, median: ages.length ? ages[Math.floor(ages.length / 2)] : null };
+  $('#batchNote').textContent = `${reached} of ${lives} reached the zero-state` + (batchData.median !== null ? `, median at ${pct(batchData.median)} of life.` : '.');
+  $('#batchWrap').hidden = false; btn.disabled = false; drawBatch();
+});
+batchHover = attachHover('#batchWrap', '#batchCanvas', '#batchTip', () => batchData && {
+  xmax: 11, tip: t => { const i = Math.min(10, Math.floor(t)); if (i < 10) return `${i * 10}–${i * 10 + 10}% of life: ${batchData.bins[i]} lives`; return `never: ${batchData.never} lives`; }
+});
+function drawBatch() {
+  const cv = $('#batchCanvas'); if (!batchData || !cv.offsetParent) return;
+  const { ctx, w, h } = fitCanvas(cv), L = 8, Rr = 8, T = 14, B = 20, cols = 11, bw = (w - L - Rr) / cols;
+  const maxv = Math.max(1, ...batchData.bins, batchData.never);
+  for (let i = 0; i < cols; i++) {
+    const v = i < 10 ? batchData.bins[i] : batchData.never, bh = v / maxv * (h - T - B), x = L + i * bw + (i === 10 ? 4 : 0);
+    ctx.fillStyle = i < 10 ? CHA : INK3; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x + 1, h - B - bh, bw - 3, bh, [3, 3, 0, 0]) : ctx.rect(x + 1, h - B - bh, bw - 3, bh); ctx.fill();
+    if (batchHover.x != null && Math.min(10, Math.floor(batchHover.x)) === i) { ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, h - B - bh - 0.5, bw - 2, bh + 1); }
+  }
+  ctx.font = MONO; ctx.fillStyle = INK3; ctx.textAlign = 'left'; ctx.fillText('0%', L, h - 6); ctx.textAlign = 'center'; ctx.fillText('50%', L + 5 * bw, h - 6); ctx.fillText('never', L + 10.5 * bw + 4, h - 6);
+  ctx.textAlign = 'left'; ctx.fillText('age at reaching the zero-state', L + 2, 10);
+  ctx.strokeStyle = LINE; ctx.beginPath(); ctx.moveTo(L, h - B + 0.5); ctx.lineTo(w - Rr, h - B + 0.5); ctx.stroke();
+}
+
+// ---------- population panel ----------
+function bindPopulation() {
+  const get = () => ensureScene('population');
+  bindRange('pmu', v => fmt(v, 3), v => { const sc = scenes.population; if (sc) { sc.Pop.ramp = null; sc.Pop.p.mu = v; } });
+  bindRange('pbeta', v => fmt(v), v => { const sc = scenes.population; if (sc) sc.Pop.p.beta = v; });
+  bindRange('palpha', v => fmt(v), v => { const sc = scenes.population; if (sc) sc.Pop.p.alpha = v; });
+  bindRange('pevents', v => String(v), v => { const sc = scenes.population; if (sc) sc.Pop.p.events = v / 100; });
+  bindRange('ptq', v => `${v} units`, () => {});
+  $('#quenchBtn').addEventListener('click', () => { const sc = get(); if (!sc) return; sc.quench(+$('#ptq').value); toast(`Everyone starts at zero. The ego switches on over ${$('#ptq').value} time units.`, 3200); });
+  $('#syncBtn').addEventListener('click', () => { const sc = get(); if (!sc) return; sc.synchronize(); toast('Everyone now shares one phase: no zero-points anywhere.'); });
+  $('#guruBtn').addEventListener('click', () => { const sc = get(); if (!sc) return; sc.placeTeacher = !sc.placeTeacher; $('#guruBtn').setAttribute('aria-pressed', String(sc.placeTeacher)); $('#guruBtn').textContent = `Tap to place a teacher: ${sc.placeTeacher ? 'on' : 'off'}`; });
+  $('#clearGuruBtn').addEventListener('click', () => { const sc = get(); if (sc) { sc.clearTeachers(); toast('Teachers removed.'); } });
+}
+bindPopulation();
+let popHover = attachHover('#popWrap', '#popCanvas', '#popTip', () => { const sc = scenes.population; if (!sc || !sc.hist.x.length) return null; const h = sc.hist, t0 = h.x[0], xmax = Math.max(1, h.x[h.x.length - 1] - t0); return { xmax, tip: t => { const i = nearestIdx(h.x.map(v => v - t0), h.x.length, t); return `t ${Math.round(h.x[i])} · zero-points ${h.q[i]} · zero-state ${pct(h.z[i])}`; } }; });
+function drawPop() {
+  const sc = scenes.population; if (!sc) return; const h = sc.hist, n = h.x.length; if (!n) return; const t0 = h.x[0], xs = h.x.map(v => v - t0);
+  const rows = [
+    { label: 'zero-points', x: xs, y: h.q, n, color: INK, min: 0, auto: true, fmtMax: v => `max ${Math.round(v)}` },
+    { label: 'share in zero-state', x: xs, y: h.z, n, color: INK, fill: 'rgba(246,241,230,0.14)', min: 0, max: 1, fmtMax: () => '100%' }
+  ];
+  rows.xLabel0 = `t ${Math.round(t0)}`; rows.xLabel1 = `t ${Math.round(h.x[n - 1])}`;
+  drawRows($('#popCanvas'), rows, Math.max(1, xs[n - 1]), null, popHover.x);
+}
+
+// ---------- universe panel ----------
+function bindUniverse() {
+  const get = () => ensureScene('universe');
+  bindRange('umu', v => fmt(v, 3), v => { const sc = scenes.universe; if (sc) { sc.U.ramp = null; sc.U.p.mu = v; } });
+  bindRange('ubeta', v => fmt(v), v => { const sc = scenes.universe; if (sc) sc.U.p.beta = v; });
+  bindRange('uslice', v => pct(v), v => { const sc = scenes.universe; if (sc) sc.setSlice(v); });
+  const seeds = { seedBang: ['bang', 'Big bang: every small region picks its own phase.'], seedTrefoil: ['trefoil', 'A trefoil knot of zero-state. Watch it tighten and reconnect.'], seedHopf: ['hopf', 'Two linked rings of zero-state, linking number −1. Watch them reconnect and come apart: it drops to 0.'], seedRing: ['ring', 'A single ring of zero-state.'] };
+  for (const id in seeds) $('#' + id).addEventListener('click', () => { const sc = get(); if (!sc) return; sc.U.p.beta = +$('#ubeta').value; sc.seed(seeds[id][0]); toast(seeds[id][1], 3400); });
+  for (const [id, key] of [['showLines', 'lines'], ['showCloud', 'cloud'], ['showSlice', 'slice']]) $('#' + id).addEventListener('click', () => { const sc = get(); if (!sc) return; sc.show[key] = !sc.show[key]; $('#' + id).setAttribute('aria-pressed', String(sc.show[key])); });
+}
+bindUniverse();
+let uniHover = attachHover('#uniWrap', '#uniCanvas', '#uniTip', () => { const sc = scenes.universe; if (!sc || !sc.hist.x.length) return null; const h = sc.hist, t0 = h.x[0], xmax = Math.max(1, h.x[h.x.length - 1] - t0); return { xmax, tip: t => { const i = nearestIdx(h.x.map(v => v - t0), h.x.length, t); return `t ${Math.round(h.x[i])} · line length ${Math.round(h.len[i])} · zero-state ${pct(h.z[i])}`; } }; });
+function drawUni() {
+  const sc = scenes.universe; if (!sc) return; const h = sc.hist, n = h.x.length; if (!n) return; const t0 = h.x[0], xs = h.x.map(v => v - t0);
+  const rows = [
+    { label: 'zero-line length', x: xs, y: h.len, n, color: INK, min: 0, auto: true, fmtMax: v => `max ${Math.round(v)}` },
+    { label: 'share in zero-state', x: xs, y: h.z, n, color: INK, fill: 'rgba(246,241,230,0.14)', min: 0, max: 1, fmtMax: () => '100%' }
+  ];
+  rows.xLabel0 = `t ${Math.round(t0)}`; rows.xLabel1 = `t ${Math.round(h.x[n - 1])}`;
+  drawRows($('#uniCanvas'), rows, Math.max(1, xs[n - 1]), null, uniHover.x);
+}
+
+let chartTick = 0;
+function drawCharts(force) {
+  chartTick++;
+  if (active === 'psyche') { drawBif(P); if (force || chartTick % 3 === 0) drawLife(); if (force) drawBatch(); }
+  if (active === 'population' && (force || chartTick % 6 === 0)) drawPop();
+  if (active === 'universe' && (force || chartTick % 6 === 0)) drawUni();
+}
+
+// ---------- 3D labels ----------
+const vtmp = THREE ? new THREE.Vector3() : null;
+function placeLabels(sc) {
+  if (!sc.labels || !sc.labels.length || !vtmp) return; const st = $('#stage'), w = st.clientWidth, h = st.clientHeight;
+  for (const L of sc.labels) {
+    vtmp.copy(L.v).project(sc.camera); const vis = vtmp.z < 1 && Math.abs(vtmp.x) < 1.05 && Math.abs(vtmp.y) < 1.05;
+    const hideEnds = sc.view === 'top' && !L.el.classList.contains('ego');
+    L.el.hidden = !vis || active !== 'psyche' || hideEnds; if (vis) { L.el.style.left = ((vtmp.x + 1) / 2 * w) + 'px'; L.el.style.top = ((1 - vtmp.y) / 2 * h) + 'px'; }
+  }
+}
+
+// ---------- main loop ----------
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!$('#bench').hidden) {
+    const sc = scenes[active];
+    if (sc) {
+      if (!paused) sc.simulate(dt, speed);
+      sc.update(dt);
+      if (renderer && sc.scene) {
+        const vh = renderer.domElement.height;
+        sc.scene.traverse(o => { if (o.material && o.material.uniforms && o.material.uniforms.uViewH) o.material.uniforms.uViewH.value = vh; });
+        renderer.render(sc.scene, sc.camera);
+        placeLabels(sc);
+      }
+    }
+    drawCharts(false);
+  }
+  requestAnimationFrame(loop);
+}
+
+// ---------- notes figures (SVG) ----------
+let notesDrawn = false;
+function svgEl(tag, attrs, text) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
+function axisFrame(svg, { W, H, L, R, T, B, xTicks, yTicks, X, Y, xLab, yLab, xFmt, yFmt }) {
+  const g = svgEl('g', {}); svg.appendChild(g);
+  for (const v of yTicks) { g.appendChild(svgEl('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), stroke: LINE, 'stroke-width': 1 })); g.appendChild(svgEl('text', { x: L - 8, y: Y(v) + 4, 'text-anchor': 'end', fill: INK3, 'font-family': 'IBM Plex Mono, monospace', 'font-size': 11 }, yFmt(v))); }
+  for (const v of xTicks) { g.appendChild(svgEl('line', { x1: X(v), x2: X(v), y1: H - B, y2: H - B + 5, stroke: LINE2 })); g.appendChild(svgEl('text', { x: X(v), y: H - B + 18, 'text-anchor': 'middle', fill: INK3, 'font-family': 'IBM Plex Mono, monospace', 'font-size': 11 }, xFmt(v))); }
+  g.appendChild(svgEl('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, stroke: LINE2 }));
+  g.appendChild(svgEl('text', { x: W - R, y: H - 4, 'text-anchor': 'end', fill: INK2, 'font-family': 'IBM Plex Sans, sans-serif', 'font-size': 12 }, xLab));
+  g.appendChild(svgEl('text', { x: L, y: T - 10, 'text-anchor': 'start', fill: INK2, 'font-family': 'IBM Plex Sans, sans-serif', 'font-size': 12 }, yLab));
+}
+function svgHover(svg, tipSel, W, points, fmtFn) {
+  const tip = $(tipSel), ring = svgEl('circle', { r: 6, fill: 'none', stroke: INK, 'stroke-width': 1.5, opacity: 0 }); svg.appendChild(ring);
+  svg.addEventListener('pointermove', e => {
+    const r = svg.getBoundingClientRect(), sx = (e.clientX - r.left) / r.width * W; let best = null, bd = 1e9;
+    for (const p of points) { const d = Math.abs(p.x - sx); if (d < bd) { bd = d; best = p; } }
+    if (!best || bd > 40) { tip.classList.remove('on'); ring.setAttribute('opacity', 0); return; }
+    ring.setAttribute('cx', best.x); ring.setAttribute('cy', best.y); ring.setAttribute('opacity', 1);
+    tip.innerHTML = fmtFn(best); tip.style.left = clamp(best.x / W * r.width, 70, r.width - 70) + 'px'; tip.style.top = (best.y / W * r.width) + 'px'; tip.classList.add('on');
+  });
+  svg.addEventListener('pointerleave', () => { tip.classList.remove('on'); ring.setAttribute('opacity', 0); });
+}
+function drawNotesFigures() {
+  if (notesDrawn) return; notesDrawn = true;
+  // 1. aim rule
+  { const svg = $('#figAim'), W = 700, H = 250, L = 48, R = 16, T = 26, B = 36;
+    const X = d => L + d / 180 * (W - L - R), Y = v => T + (1 - v / 2.05) * (H - T - B);
+    axisFrame(svg, { W, H, L, R, T, B, xTicks: [0, 30, 60, 90, 120, 150, 180], yTicks: [0, 0.5, 1, 1.5, 2], X, Y, xLab: 'aim error δ (degrees)', yLab: 'knot size after ÷ before', xFmt: v => v + '°', yFmt: v => fmt(v, 1) });
+    svg.appendChild(svgEl('line', { x1: L, x2: W - R, y1: Y(1), y2: Y(1), stroke: INK3, 'stroke-dasharray': '5 4', 'stroke-width': 1.5 }));
+    const pts = [];
+    for (const [a, colr] of [[1, CHA], [0.5, CHB]]) {
+      let d = ''; for (let i = 0; i <= 180; i++) { const r = Math.hypot(1 - a * Math.cos(i * Math.PI / 180), a * Math.sin(i * Math.PI / 180)); d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(r).toFixed(1); if (i % 5 === 0) pts.push({ x: X(i), y: Y(r), a, d: i, r }); }
+      svg.appendChild(svgEl('path', { d, fill: 'none', stroke: colr, 'stroke-width': 2 }));
+      const cross = Math.acos(a / 2) * 180 / Math.PI;
+      svg.appendChild(svgEl('circle', { cx: X(cross), cy: Y(1), r: 4.5, fill: colr, stroke: '#10121c', 'stroke-width': 2 }));
+      svg.appendChild(svgEl('text', { x: X(cross) + (a === 1 ? -8 : 8), y: Y(1) - 10, 'text-anchor': a === 1 ? 'end' : 'start', fill: INK, 'font-family': 'IBM Plex Mono, monospace', 'font-size': 11.5 }, `α = ${a}: worse past ${Math.round(cross)}°`));
+    }
+    svgHover(svg, '#figAimTip', W, pts, p => `α = ${p.a}, δ = ${p.d}° → ×${fmt(p.r)}`);
+  }
+  // 2. liberation threshold vs beta
+  { const svg = $('#figThresh'), W = 700, H = 300, L = 56, R = 16, T = 26, B = 38;
+    const X = b => L + b / 1.25 * (W - L - R), Y = m => T + (0.03 - m) / 0.31 * (H - T - B);
+    // regions
+    const band = (y0, y1, fill) => svg.appendChild(svgEl('rect', { x: L, y: Y(y0), width: W - L - R, height: Y(y1) - Y(y0), fill }));
+    band(0.03, 0, 'rgba(242,163,58,0.06)'); band(-0.25, -0.28, 'rgba(246,241,230,0.05)');
+    axisFrame(svg, { W, H, L, R, T, B, xTicks: [0, 0.25, 0.5, 0.75, 1, 1.25], yTicks: [0, -0.05, -0.1, -0.15, -0.2, -0.25], X, Y, xLab: 'rhythm shift β', yLab: 'collective ego gain μ', xFmt: v => fmt(v, 2), yFmt: v => fmt(v, 2) });
+    const data = [[0, -0.22, -0.18], [0.15, -0.20, -0.18], [0.3, -0.17, -0.15], [0.45, -0.14, -0.10], [0.6, -0.06, -0.01], [0.75, -0.005, 0], [0.9, -0.01, 0], [1.2, -0.01, 0]];
+    svg.appendChild(svgEl('line', { x1: X(0), x2: X(1.25), y1: Y(-0.25), y2: Y(-0.25), stroke: CHB, 'stroke-width': 2, 'stroke-dasharray': '6 4' }));
+    let d = ''; const pts = [];
+    data.forEach(([b, lo, hi], i) => { const m = (lo + hi) / 2; d += (i ? 'L' : 'M') + X(b) + ' ' + Y(m); });
+    svg.appendChild(svgEl('path', { d, fill: 'none', stroke: CHA, 'stroke-width': 2 }));
+    data.forEach(([b, lo, hi]) => { const m = (lo + hi) / 2; svg.appendChild(svgEl('line', { x1: X(b), x2: X(b), y1: Y(lo), y2: Y(hi), stroke: CHA, 'stroke-width': 1.5 })); svg.appendChild(svgEl('circle', { cx: X(b), cy: Y(m), r: 4.5, fill: CHA, stroke: '#10121c', 'stroke-width': 2 })); pts.push({ x: X(b), y: Y(m), b, lo, hi }); });
+    const txt = (x, y, s, anchor = 'start', fill = INK2) => svg.appendChild(svgEl('text', { x, y, 'text-anchor': anchor, fill, 'font-family': 'IBM Plex Sans, sans-serif', 'font-size': 12 }, s));
+    txt(W - R - 6, Y(0.03) + 16, 'μ > 0: attachment everywhere', 'end', INK3);
+    txt(X(0.02) + 4, Y(-0.06), 'stuck: zero-points don’t help', 'start', INK3);
+    txt(X(0.62), Y(-0.17), 'zero-state spreads from zero-points', 'start', INK);
+    txt(W - R - 6, Y(-0.25) + 18, 'μ < −¼: everything resolves', 'end', INK3);
+    txt(X(0.02) + 4, Y(-0.25) - 7, 'synchronised world holds until here', 'start', INK2);
+    svg.appendChild(svgEl('line', { x1: X(0) - 6, x2: X(0) + 6, y1: Y(-0.1875), y2: Y(-0.1875), stroke: INK, 'stroke-width': 1.5 }));
+    svg.appendChild(svgEl('line', { x1: X(0) + 8, x2: X(0.14), y1: Y(-0.1875), y2: Y(-0.222), stroke: INK3, 'stroke-width': 1 }));
+    txt(X(0.145), Y(-0.222) + 4, 'Maxwell point −3/16', 'start', INK3);
+    svgHover(svg, '#figThreshTip', W, pts, p => `β = ${p.b}: takes over at μ = ${fmt(p.lo, 3)}, not at ${fmt(p.hi, 3)}`);
+  }
+  // 3. Kibble-Zurek
+  { const svg = $('#figKZ'), W = 700, H = 280, L = 56, R = 16, T = 26, B = 38;
+    const tq = [32, 64, 128, 256, 512, 1024], nm = [130, 98.5, 63.5, 42.5, 29.5, 23.5], sd = [4.7, 4.6, 10.3, 0.9, 7.1, 4.8];
+    const lx0 = Math.log(20), lx1 = Math.log(1600), ly0 = Math.log(15), ly1 = Math.log(200);
+    const X = t => L + (Math.log(t) - lx0) / (lx1 - lx0) * (W - L - R), Y = v => T + (1 - (Math.log(v) - ly0) / (ly1 - ly0)) * (H - T - B);
+    axisFrame(svg, { W, H, L, R, T, B, xTicks: [32, 64, 128, 256, 512, 1024], yTicks: [20, 50, 100, 200], X, Y, xLab: 'time for the ego to switch on, τ (log)', yLab: 'zero-points left behind (log)', xFmt: v => String(v), yFmt: v => String(v) });
+    const lx = tq.map(Math.log), ly = nm.map(Math.log), mx = lx.reduce((a, b) => a + b) / 6, my = ly.reduce((a, b) => a + b) / 6;
+    let sxy = 0, sxx = 0; for (let i = 0; i < 6; i++) { sxy += (lx[i] - mx) * (ly[i] - my); sxx += (lx[i] - mx) ** 2; }
+    const slope = sxy / sxx, icpt = my - slope * mx;
+    const line = (s, c, col, dash) => svg.appendChild(svgEl('line', { x1: X(24), x2: X(1400), y1: Y(Math.exp(c + s * Math.log(24))), y2: Y(Math.exp(c + s * Math.log(1400))), stroke: col, 'stroke-width': dash ? 1.5 : 2, 'stroke-dasharray': dash || '' }));
+    line(-0.5, my + 0.5 * mx, INK3, '5 4'); line(slope, icpt, CHA, '');
+    const pts = [];
+    tq.forEach((t, i) => { svg.appendChild(svgEl('line', { x1: X(t), x2: X(t), y1: Y(nm[i] + sd[i]), y2: Y(Math.max(1, nm[i] - sd[i])), stroke: CHA, 'stroke-width': 1.5 })); svg.appendChild(svgEl('circle', { cx: X(t), cy: Y(nm[i]), r: 5, fill: CHA, stroke: '#10121c', 'stroke-width': 2 })); pts.push({ x: X(t), y: Y(nm[i]), t, n: nm[i], s: sd[i] }); });
+    svg.appendChild(svgEl('text', { x: X(700), y: Y(Math.exp(icpt + slope * Math.log(700))) + 26, 'text-anchor': 'middle', fill: INK, 'font-family': 'IBM Plex Mono, monospace', 'font-size': 11.5 }, `slope ${fmt(slope)}`));
+    svgHover(svg, '#figKZTip', W, pts, p => `τ = ${p.t}: ${p.n} ± ${p.s} zero-points`);
+  }
+}
+
+// ---------- start ----------
+antidoteVerdict(P.p.dose, P.p.aim);
+const initial = (location.hash || '#psyche').slice(1);
+selectTab(initial);
+if (renderer) PS.setView('follow');
+resize(); drawCharts(true);
+requestAnimationFrame(loop);
+
+</script>
+
+</body></html>
